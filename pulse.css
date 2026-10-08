@@ -2488,3 +2488,112 @@ body {
     right: 3%;
   }
 }
+
+/* =========================================================
+   19. TRUST LEDGER + OPEN CHANNEL SECTIONS
+========================================================= */
+
+.info-section {
+  overflow: hidden;
+}
+
+.section-detail {
+  position: relative;
+  align-self: center;
+  max-width: 500px;
+  padding-left: 30px;
+  border-left: 2px solid rgba(255, 255, 255, 0.42);
+}
+
+.trust-points {
+  display: grid;
+  gap: 10px;
+  margin-top: 26px;
+}
+
+.trust-points span {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: var(--text-white);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(12px);
+}
+
+.trust-points b {
+  color: var(--stable-green-primary);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.contact-detail {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-left-color: rgba(255, 255, 255, 0.62);
+}
+
+.contact-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 24px;
+  padding: 13px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 8px;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: rgba(128, 0, 32, 0.84);
+  box-shadow: 5px 5px 0 rgba(23, 32, 51, 0.14);
+  transition: transform 0.25s var(--ease), background 0.25s ease;
+}
+
+.contact-action:hover {
+  transform: translate(-2px, -2px);
+  background: rgba(5, 150, 105, 0.9);
+}
+
+.contact-action span {
+  font-size: 16px;
+  line-height: 0.6;
+}
+
+.contact-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.contact-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--stable-green-primary);
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.18);
+}
+
+@media (max-width: 560px) {
+  .info-section {
+    padding: 64px 24px;
+  }
+
+  .section-detail {
+    padding-left: 18px;
+  }
+
+  .trust-points span {
+    font-size: 9px;
+  }
+}
