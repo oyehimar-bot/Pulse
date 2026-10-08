@@ -2140,3 +2140,290 @@ a {
     padding: 56px 24px;
   }
 }
+
+/* =========================================================
+   18. DEAL DESK ART DIRECTION
+========================================================= */
+
+body {
+  background: #EDEBE5;
+}
+
+.page {
+  border-radius: 28px;
+  border-color: rgba(128, 0, 32, 0.22);
+  box-shadow: 0 28px 80px rgba(50, 16, 29, 0.18), 0 6px 18px rgba(23, 32, 51, 0.08);
+}
+
+.navbar {
+  height: 92px;
+  border-bottom: 1px solid rgba(23, 32, 51, 0.1);
+}
+
+.brand {
+  color: #172033;
+  font-size: 17px;
+  letter-spacing: 0.04em;
+}
+
+.brand-name::after {
+  content: " / CREATIVE COMMERCE";
+  color: var(--burgundy-primary);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.nav-links {
+  gap: 42px;
+}
+
+.nav-links a {
+  color: #526078;
+  letter-spacing: 0.18em;
+}
+
+.nav-links a:hover,
+.nav-links a.active {
+  color: var(--burgundy-primary);
+}
+
+.nav-links a::after {
+  background: var(--burgundy-primary);
+  box-shadow: none;
+}
+
+.signin-button {
+  border-radius: 8px;
+  color: #FFFFFF;
+  background: var(--burgundy-primary);
+  border-color: var(--burgundy-primary);
+  box-shadow: 4px 4px 0 rgba(37, 99, 235, 0.22);
+}
+
+.signin-button:hover {
+  color: #FFFFFF;
+  background: var(--pulse-blue-primary);
+  transform: translate(-1px, -1px);
+}
+
+.hero {
+  position: relative;
+  min-height: 720px;
+  padding: 42px 42px 56px;
+  border-bottom: 1px solid rgba(23, 32, 51, 0.12);
+}
+
+.hero::before {
+  content: "01 / LIVE DEAL DESK";
+  position: absolute;
+  left: 42px;
+  top: 24px;
+  color: var(--burgundy-primary);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+}
+
+.hero-copy {
+  padding-left: 30px;
+  border-left: 4px solid var(--burgundy-primary);
+}
+
+.hero-title {
+  max-width: 470px;
+  color: #172033;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(44px, 5vw, 72px);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+}
+
+.hero-title .white {
+  color: #172033;
+}
+
+.hero-title .muted {
+  margin-top: 10px;
+  color: var(--burgundy-primary);
+  font-family: "Poppins", sans-serif;
+  font-size: 0.38em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.hero-description {
+  max-width: 350px;
+  margin-top: 28px;
+  color: #526078;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.demo-button {
+  border-radius: 8px;
+  color: #FFFFFF;
+  background: var(--pulse-blue-primary);
+  border-color: var(--pulse-blue-primary);
+  box-shadow: 5px 5px 0 rgba(128, 0, 32, 0.18);
+}
+
+.demo-button:hover {
+  background: var(--stable-green-dark);
+  border-color: var(--stable-green-dark);
+  box-shadow: 5px 5px 0 rgba(128, 0, 32, 0.18);
+}
+
+.hero-visual {
+  min-height: 620px;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 24px;
+  background: rgba(37, 99, 235, 0.06);
+  box-shadow: inset 0 0 0 10px rgba(255, 255, 255, 0.32);
+}
+
+.hero-visual::before {
+  content: "CONVERSATION / ESCROW / DELIVERY";
+  position: absolute;
+  left: 22px;
+  bottom: 18px;
+  z-index: 15;
+  color: var(--pulse-blue-dark);
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.scene-aura {
+  width: 430px;
+  height: 430px;
+  background: rgba(16, 185, 129, 0.1);
+  filter: blur(18px);
+}
+
+.conversation-panel {
+  border: 2px solid rgba(37, 99, 235, 0.32);
+  border-radius: 14px;
+  box-shadow: 12px 14px 0 rgba(128, 0, 32, 0.12), inset 0 0 0 5px rgba(255, 255, 255, 0.38);
+}
+
+.panel-heading strong {
+  letter-spacing: 0.04em;
+}
+
+.deal-actions span:first-child {
+  color: #FFFFFF;
+  background: var(--stable-green-dark);
+  border-color: var(--stable-green-dark);
+}
+
+.message-bubble {
+  border-radius: 8px;
+  box-shadow: 5px 6px 0 rgba(23, 32, 51, 0.1);
+}
+
+.bubble-left {
+  border-left: 4px solid var(--stable-green-primary);
+}
+
+.bubble-right {
+  border-right: 4px solid var(--pulse-blue-primary);
+}
+
+.bot-message {
+  border-left: 4px solid var(--burgundy-primary);
+}
+
+.info-section {
+  position: relative;
+  min-height: 340px;
+  padding: 78px 12%;
+  border-top: 0;
+}
+
+.info-section::before {
+  position: absolute;
+  left: 12%;
+  top: 24px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+}
+
+#about::before {
+  content: "02 / THE IDEA";
+}
+
+#contact::before {
+  content: "03 / THE CONNECTION";
+}
+
+.info-section h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(34px, 4vw, 58px);
+  letter-spacing: -0.03em;
+}
+
+.section-icon {
+  width: 92px;
+  height: 92px;
+  padding: 12px;
+  margin-bottom: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.contact-section {
+  background: rgba(37, 99, 235, 0.56);
+}
+
+.contact-section .section-kicker,
+.contact-section h2,
+.contact-section p {
+  color: #FFFFFF;
+}
+
+.contact-section p a {
+  color: #FFFFFF;
+}
+
+@media (max-width: 900px) {
+  .hero {
+    min-height: 0;
+    padding-top: 62px;
+  }
+
+  .hero::before {
+    left: 24px;
+  }
+
+  .hero-copy {
+    border-left: 0;
+    border-top: 4px solid var(--burgundy-primary);
+    padding: 22px 0 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .brand-name::after {
+    display: none;
+  }
+
+  .navbar {
+    height: 78px;
+  }
+
+  .hero {
+    padding: 58px 24px 40px;
+  }
+
+  .hero-visual {
+    border-radius: 16px;
+  }
+}
