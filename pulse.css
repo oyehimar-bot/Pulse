@@ -8,8 +8,8 @@
   --pulse-blue-primary: #2563EB;
 
   /* Innovation, Creators & Bot Prompts */
-  --creative-violet-dark: #7C3AED;
-  --creative-violet-primary: #9333EA;
+  --creative-violet-dark: #800020;
+  --creative-violet-primary: #881337;
 
   /* Escrow Locked & Verified Success States */
   --stable-green-dark: #059669;
@@ -20,19 +20,19 @@
   --burgundy-primary: #881337;
 
   /* Neutral Dark Canvas & Glassmorphism */
-  --bg-midnight: #0B081E;
-  --bg-midnight-lift: #170F38;
-  --bg-midnight-lift-deep: #120C2D;
-  --surface-card: rgba(24, 18, 54, 0.7);
+  --bg-midnight: #260914;
+  --bg-midnight-lift: #4a1020;
+  --bg-midnight-lift-deep: #32101d;
+  --surface-card: rgba(55, 15, 31, 0.82);
   --text-white: #FFFFFF;
-  --text-muted: #9FA8DA;
+  --text-muted: #d8b5c1;
 
   /* Derived, palette-only effects (alpha layers of the tokens above) */
   --pulse-blue-glow: rgba(37, 99, 235, 0.45);
-  --creative-violet-glow: rgba(147, 51, 234, 0.40);
+  --creative-violet-glow: rgba(136, 19, 55, 0.40);
   --stable-green-glow: rgba(16, 185, 129, 0.35);
   --burgundy-glow: rgba(136, 19, 55, 0.40);
-  --glass-border: rgba(159, 168, 218, 0.16);
+  --glass-border: rgba(216, 181, 193, 0.24);
 
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -99,9 +99,8 @@ a {
   border-radius: 22px;
 
   background:
-    radial-gradient(circle at 76% 12%, rgba(124, 58, 237, 0.20), transparent 40%),
-    radial-gradient(circle at 88% 62%, rgba(37, 99, 235, 0.16), transparent 42%),
-    radial-gradient(circle at 10% 88%, rgba(30, 58, 138, 0.28), transparent 48%),
+    radial-gradient(circle at 76% 12%, rgba(37, 99, 235, 0.25), transparent 40%),
+    radial-gradient(circle at 10% 88%, rgba(5, 150, 105, 0.22), transparent 48%),
     linear-gradient(178deg, var(--bg-midnight-lift) 0%, var(--bg-midnight-lift-deep) 50%, var(--bg-midnight) 100%);
 
   border: 1px solid var(--glass-border);
@@ -475,6 +474,7 @@ a {
 
   display: grid;
   place-items: center;
+  overflow: hidden;
 
   perspective: 1500px;
 }
@@ -482,7 +482,7 @@ a {
 .scene {
   position: relative;
 
-  width: 660px;
+  width: min(660px, 100%);
   height: 620px;
 
   transform-style: preserve-3d;
@@ -1460,7 +1460,7 @@ a {
    15. RESPONSIVE
 ========================================================= */
 
-@media (max-width: 1180px) {
+@media (max-width: 900px) {
   .hero {
     grid-template-columns: 1fr;
     gap: 40px;
@@ -1618,9 +1618,10 @@ a {
 
 .conversation-panel {
   position: absolute;
+  z-index: 5;
   left: 50%;
   top: 43%;
-  width: 510px;
+  width: min(510px, calc(100% - 56px));
   height: 300px;
   transform: translate(-50%, -50%) rotate(-3deg);
   border: 1px solid rgba(159, 168, 218, 0.28);
@@ -1639,6 +1640,7 @@ a {
   color: var(--text-white);
   font-size: 10px;
   letter-spacing: 0.04em;
+  z-index: 2;
 }
 
 .panel-heading span:last-child {
@@ -1665,6 +1667,7 @@ a {
   gap: 5px;
   color: var(--text-muted);
   font-size: 9px;
+  z-index: 2;
 }
 
 .deal-summary strong {
@@ -1729,6 +1732,7 @@ a {
   top: 22px;
   max-width: 150px;
   text-align: right;
+  z-index: 2;
 }
 
 .panel-status span,
@@ -1748,6 +1752,7 @@ a {
   align-items: center;
   gap: 5px;
   height: 26px;
+  z-index: 2;
 }
 
 .panel-wave i {
@@ -1767,22 +1772,35 @@ a {
   position: absolute;
   z-index: 4;
   width: 150px;
-  height: 270px;
+  height: 205px;
   transform-style: preserve-3d;
   animation: personFloat 5s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .person-left {
-  left: 10%;
-  top: 28%;
-  transform: rotate(-8deg) translateZ(130px);
+  left: 0;
+  top: 31%;
+  transform: rotate(-5deg) translateZ(130px);
 }
 
 .person-right {
-  right: 5%;
-  top: 18%;
-  transform: rotate(9deg) translateZ(150px);
+  right: 0;
+  top: 22%;
+  transform: rotate(5deg) translateZ(150px);
   animation-delay: -2.4s;
+}
+
+.character-image {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 150px;
+  height: 205px;
+  display: block;
+  object-fit: contain;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 24px 20px rgba(4, 2, 16, 0.35));
 }
 
 @keyframes personFloat {
@@ -1860,6 +1878,12 @@ a {
   font-weight: 700;
   letter-spacing: 0.08em;
   white-space: nowrap;
+}
+
+.person-left .person-label,
+.person-right .person-label {
+  top: -3px;
+  z-index: 3;
 }
 
 .person-left .person-label {
@@ -1945,9 +1969,10 @@ a {
   .hero-visual { min-height: 500px; }
   .scene {
     position: absolute;
+    width: calc(100vw / 0.8);
     left: 50%;
     top: 0;
-    margin-left: -330px;
+    margin-left: calc(-50vw / 0.8);
     transform-origin: center top;
   }
   .hero { grid-template-columns: 1fr; padding-top: 32px; }
@@ -1956,7 +1981,10 @@ a {
 }
 
 @media (max-width: 520px) {
-  .scene { transform: scale(0.58); }
-  .hero-visual { min-height: 410px; margin-top: -30px; }
+  .scene {
+    width: calc(100vw / 0.62);
+    margin-left: calc(-50vw / 0.62);
+    transform: scale(0.58);
+  }
   .brand-logo { width: 30px; height: 30px; }
 }
