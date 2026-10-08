@@ -39,9 +39,39 @@ navLinks.querySelectorAll("a").forEach((link) => {
   });
 });
 
+const signInButton = document.getElementById("signInButton");
+const signInPanel = document.getElementById("signinPanel");
+const signInForm = document.getElementById("signinForm");
+
+function setSignInOpen(isOpen) {
+  signInPanel.classList.toggle("open", isOpen);
+  signInPanel.setAttribute("aria-hidden", String(!isOpen));
+  signInButton.setAttribute("aria-expanded", String(isOpen));
+  signInPanel.style.setProperty("opacity", isOpen ? "1" : "0", "important");
+  signInPanel.style.setProperty("visibility", isOpen ? "visible" : "hidden", "important");
+}
+
+signInButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  setSignInOpen(!signInPanel.classList.contains("open"));
+});
+
+signInPanel.addEventListener("click", (event) => {
+  event.stopPropagation();
+});
+
+document.addEventListener("click", () => {
+  setSignInOpen(false);
+});
+
+signInForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+});
+
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
+    setSignInOpen(false);
     closeModal();
   }
 });

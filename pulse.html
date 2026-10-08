@@ -39,10 +39,23 @@
         <a href="#home" class="active">Home</a>
         <a href="#about">About Us</a>
         <a href="#contact">Contact</a>
-        <a href="#signin">Sign In</a>
       </nav>
 
-      <a class="signin-button" href="#signin">Sign In</a>
+      <button class="signin-button" id="signInButton" type="button" aria-expanded="false" aria-controls="signinPanel">Sign In</button>
+
+      <div class="signin-panel" id="signinPanel" aria-hidden="true">
+        <div class="signin-panel-heading">
+          <span class="section-kicker">Pulse workspace</span>
+          <h2>Welcome back.</h2>
+        </div>
+        <form class="signin-form" id="signinForm">
+          <label for="signinEmail">Email address</label>
+          <input id="signinEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+          <label for="signinPassword">Password</label>
+          <input id="signinPassword" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required />
+          <button type="submit">Continue to Pulse</button>
+        </form>
+      </div>
 
     </header>
 
@@ -161,15 +174,6 @@
       </div>
       <p>Have a beat, a brief, or a question about a deal? Reach the Pulse team at <a href="mailto:hello@pulse.example">hello@pulse.example</a>.</p>
     </section>
-
-    <section class="info-section signin-section" id="signin">
-      <div>
-        <span class="section-kicker">Sign In</span>
-        <h2>Your deals, in rhythm.</h2>
-      </div>
-      <p>Sign-in is coming soon. Your current Pulse workspace will stay ready for the next conversation.</p>
-    </section>
-
 
     <!-- =====================================================
          SOCIAL RAIL

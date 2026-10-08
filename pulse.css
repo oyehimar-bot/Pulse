@@ -258,6 +258,87 @@ a {
   transform: translateY(-1px);
 }
 
+.signin-panel {
+  position: absolute;
+  top: 72px;
+  right: 42px;
+  z-index: 80;
+  width: min(350px, calc(100vw - 32px));
+  padding: 24px;
+  border: 1px solid rgba(216, 181, 193, 0.32);
+  border-radius: 18px;
+  background: rgba(38, 9, 20, 0.94);
+  backdrop-filter: blur(22px);
+  box-shadow: 0 24px 70px rgba(4, 2, 16, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: opacity 0.24s ease, transform 0.24s ease, visibility 0.24s ease;
+}
+
+.signin-panel.open {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateY(0);
+}
+
+.signin-panel-heading h2 {
+  margin-top: 8px;
+  color: var(--text-white);
+  font-size: 24px;
+}
+
+.signin-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.signin-form label {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.signin-form input {
+  width: 100%;
+  margin-bottom: 7px;
+  padding: 11px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 9px;
+  outline: 0;
+  color: var(--text-white);
+  background: rgba(37, 99, 235, 0.2);
+}
+
+.signin-form input:focus {
+  border-color: var(--stable-green-primary);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+}
+
+.signin-form input::placeholder {
+  color: rgba(216, 181, 193, 0.7);
+}
+
+.signin-form button {
+  margin-top: 7px;
+  padding: 12px 14px;
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  border-radius: 9px;
+  color: var(--text-white);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(5, 150, 105, 0.7);
+}
+
+.signin-form button:hover {
+  background: rgba(5, 150, 105, 0.95);
+}
+
 
 /* =========================================================
    5. HERO LAYOUT
@@ -419,10 +500,6 @@ a {
 
 .contact-section {
   background: rgba(37, 99, 235, 0.5);
-}
-
-.signin-section {
-  background: rgba(5, 150, 105, 0.46);
 }
 
 .section-kicker {
