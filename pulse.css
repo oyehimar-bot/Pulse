@@ -2309,6 +2309,7 @@ body {
   border: 2px solid rgba(37, 99, 235, 0.32);
   border-radius: 14px;
   box-shadow: 12px 14px 0 rgba(128, 0, 32, 0.12), inset 0 0 0 5px rgba(255, 255, 255, 0.38);
+  z-index: 3;
 }
 
 .panel-heading strong {
@@ -2324,6 +2325,15 @@ body {
 .message-bubble {
   border-radius: 8px;
   box-shadow: 5px 6px 0 rgba(23, 32, 51, 0.1);
+  z-index: 10;
+}
+
+.human-person {
+  z-index: 8;
+}
+
+.pulse-beam {
+  z-index: 9;
 }
 
 .bubble-left {
@@ -2425,5 +2435,56 @@ body {
 
   .hero-visual {
     border-radius: 16px;
+    min-height: 500px;
+    margin-top: 4px;
+  }
+}
+
+@media (max-width: 560px) {
+  .hero-visual {
+    min-height: 430px;
+    margin-inline: -4px;
+  }
+
+  .hero-visual::before {
+    left: 14px;
+    bottom: 12px;
+    font-size: 6px;
+  }
+
+  .conversation-panel {
+    width: calc(100% - 40px);
+    height: 280px;
+  }
+
+  .human-person {
+    transform: scale(0.9) translateZ(130px);
+    transform-origin: bottom center;
+  }
+
+  .person-left {
+    left: 8%;
+  }
+
+  .person-right {
+    right: 8%;
+  }
+
+  .message-bubble {
+    max-width: 145px;
+    padding: 10px 11px;
+    font-size: 8px;
+  }
+
+  .bubble-left {
+    left: 1%;
+  }
+
+  .bubble-right {
+    right: 1%;
+  }
+
+  .bot-message {
+    right: 3%;
   }
 }
