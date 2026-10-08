@@ -55,6 +55,8 @@ function setAuthMode(isSignUp) {
     : "New to Pulse? Create an account";
 }
 
+  setAuthMode(true);
+
 function setSignInOpen(isOpen) {
   signInPanel.classList.toggle("open", isOpen);
   signInPanel.setAttribute("aria-hidden", String(!isOpen));
