@@ -1790,6 +1790,65 @@ a {
   object-fit: contain;
   transform: translateX(-50%);
   filter: drop-shadow(0 24px 20px rgba(4, 2, 16, 0.35));
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.touch-character {
+  opacity: 0;
+  transform: translateX(-50%) scale(0.96);
+}
+
+.conversation-panel:hover ~ .human-person .default-character,
+.conversation-panel.is-hovered ~ .human-person .default-character,
+.scene.panel-hovered .default-character {
+  opacity: 0;
+  transform: translateX(-50%) scale(0.96);
+}
+
+.conversation-panel:hover ~ .human-person .touch-character,
+.conversation-panel.is-hovered ~ .human-person .touch-character,
+.scene.panel-hovered .touch-character {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+.pulse-beam {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 43%;
+  width: min(300px, 46%);
+  height: 150px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.78);
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.pulse-beam::before {
+  content: "";
+  position: absolute;
+  inset: 18% 3%;
+  border: 2px solid rgba(16, 185, 129, 0.7);
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.45), inset 0 0 20px rgba(37, 99, 235, 0.35);
+}
+
+.pulse-beam img {
+  position: relative;
+  width: 118px;
+  height: 116px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 16px rgba(16, 185, 129, 0.8));
+}
+
+.conversation-panel:hover ~ .pulse-beam,
+.conversation-panel.is-hovered ~ .pulse-beam,
+.scene.panel-hovered .pulse-beam {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
 }
 
 @keyframes personFloat {

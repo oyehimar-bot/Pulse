@@ -135,6 +135,34 @@ setInterval(() => {
 ========================================================= */
 
 const scene = document.getElementById("scene");
+const conversationPanel = document.querySelector(".conversation-panel");
+const defaultCharacters = document.querySelectorAll(".default-character");
+const touchCharacters = document.querySelectorAll(".touch-character");
+const pulseBeam = document.querySelector(".pulse-beam");
+
+conversationPanel.addEventListener("pointerenter", () => {
+  conversationPanel.classList.add("is-hovered");
+  scene.classList.add("panel-hovered");
+  defaultCharacters.forEach((character) => {
+    character.style.setProperty("opacity", "0", "important");
+  });
+  touchCharacters.forEach((character) => {
+    character.style.setProperty("opacity", "1", "important");
+  });
+  pulseBeam.style.setProperty("opacity", "1", "important");
+});
+
+conversationPanel.addEventListener("pointerleave", () => {
+  conversationPanel.classList.remove("is-hovered");
+  scene.classList.remove("panel-hovered");
+  defaultCharacters.forEach((character) => {
+    character.style.setProperty("opacity", "1", "important");
+  });
+  touchCharacters.forEach((character) => {
+    character.style.setProperty("opacity", "0", "important");
+  });
+  pulseBeam.style.setProperty("opacity", "0", "important");
+});
 
 if (!REDUCED_MOTION && window.matchMedia("(pointer: fine)").matches) {
   let targetX = 0;
