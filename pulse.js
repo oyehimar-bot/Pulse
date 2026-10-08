@@ -41,21 +41,7 @@ navLinks.querySelectorAll("a").forEach((link) => {
 
 const signInButton = document.getElementById("signInButton");
 const signInPanel = document.getElementById("signinPanel");
-const signInForm = document.getElementById("signinForm");
 const signUpForm = document.getElementById("signupForm");
-const authSwitch = document.getElementById("authSwitch");
-const authHeading = document.getElementById("authHeading");
-
-function setAuthMode(isSignUp) {
-  signInForm.hidden = isSignUp;
-  signUpForm.hidden = !isSignUp;
-  authHeading.textContent = isSignUp ? "Start creating." : "Welcome back.";
-  authSwitch.textContent = isSignUp
-    ? "Already have an account? Sign in"
-    : "New to Pulse? Create an account";
-}
-
-  setAuthMode(true);
 
 function setSignInOpen(isOpen) {
   signInPanel.classList.toggle("open", isOpen);
@@ -74,16 +60,8 @@ signInPanel.addEventListener("click", (event) => {
   event.stopPropagation();
 });
 
-authSwitch.addEventListener("click", () => {
-  setAuthMode(signInForm.hidden === false);
-});
-
 document.addEventListener("click", () => {
   setSignInOpen(false);
-});
-
-signInForm.addEventListener("submit", (event) => {
-  event.preventDefault();
 });
 
 signUpForm.addEventListener("submit", (event) => {
