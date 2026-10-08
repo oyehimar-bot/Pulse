@@ -40,36 +40,8 @@ navLinks.querySelectorAll("a").forEach((link) => {
 });
 
 
-/* =========================================================
-   3. SEARCH PANEL
-========================================================= */
-
-const searchButton = document.getElementById("searchButton");
-const searchPanel = document.getElementById("searchPanel");
-const searchInput = document.getElementById("searchInput");
-
-searchButton.addEventListener("click", (event) => {
-  event.stopPropagation();
-
-  searchPanel.classList.toggle("open");
-
-  if (searchPanel.classList.contains("open")) {
-    setTimeout(() => searchInput.focus(), 150);
-  }
-});
-
-document.addEventListener("click", (event) => {
-  if (
-    !searchPanel.contains(event.target) &&
-    !searchButton.contains(event.target)
-  ) {
-    searchPanel.classList.remove("open");
-  }
-});
-
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
-    searchPanel.classList.remove("open");
     closeModal();
   }
 });
@@ -140,28 +112,27 @@ const defaultCharacters = document.querySelectorAll(".default-character");
 const touchCharacters = document.querySelectorAll(".touch-character");
 const pulseBeam = document.querySelector(".pulse-beam");
 
-conversationPanel.addEventListener("pointerenter", () => {
-  conversationPanel.classList.add("is-hovered");
-  scene.classList.add("panel-hovered");
+function setPanelHoverState(isHovered) {
+  conversationPanel.classList.toggle("is-hovered", isHovered);
+  scene.classList.toggle("panel-hovered", isHovered);
+
   defaultCharacters.forEach((character) => {
-    character.style.setProperty("opacity", "0", "important");
+    character.style.setProperty("opacity", isHovered ? "0" : "1", "important");
   });
+
   touchCharacters.forEach((character) => {
-    character.style.setProperty("opacity", "1", "important");
+    character.style.setProperty("opacity", isHovered ? "1" : "0", "important");
   });
-  pulseBeam.style.setProperty("opacity", "1", "important");
+
+  pulseBeam.style.setProperty("opacity", isHovered ? "1" : "0", "important");
+}
+
+scene.addEventListener("pointerenter", () => {
+  setPanelHoverState(true);
 });
 
-conversationPanel.addEventListener("pointerleave", () => {
-  conversationPanel.classList.remove("is-hovered");
-  scene.classList.remove("panel-hovered");
-  defaultCharacters.forEach((character) => {
-    character.style.setProperty("opacity", "1", "important");
-  });
-  touchCharacters.forEach((character) => {
-    character.style.setProperty("opacity", "0", "important");
-  });
-  pulseBeam.style.setProperty("opacity", "0", "important");
+scene.addEventListener("pointerleave", () => {
+  setPanelHoverState(false);
 });
 
 if (!REDUCED_MOTION && window.matchMedia("(pointer: fine)").matches) {
