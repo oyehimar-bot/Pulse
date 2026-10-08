@@ -339,6 +339,23 @@ a {
   background: rgba(5, 150, 105, 0.95);
 }
 
+.signup-form[hidden] {
+  display: none;
+}
+
+.auth-switch {
+  width: 100%;
+  margin-top: 16px;
+  color: var(--text-muted);
+  font-size: 10px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.auth-switch:hover {
+  color: var(--text-white);
+}
+
 
 /* =========================================================
    5. HERO LAYOUT

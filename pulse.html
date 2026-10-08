@@ -46,7 +46,7 @@
       <div class="signin-panel" id="signinPanel" aria-hidden="true">
         <div class="signin-panel-heading">
           <span class="section-kicker">Pulse workspace</span>
-          <h2>Welcome back.</h2>
+          <h2 id="authHeading">Welcome back.</h2>
         </div>
         <form class="signin-form" id="signinForm">
           <label for="signinEmail">Email address</label>
@@ -55,6 +55,18 @@
           <input id="signinPassword" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required />
           <button type="submit">Continue to Pulse</button>
         </form>
+        <form class="signin-form signup-form" id="signupForm" hidden>
+          <label for="signupName">Your name</label>
+          <input id="signupName" name="name" type="text" autocomplete="name" placeholder="Your name" required />
+          <label for="signupEmail">Email address</label>
+          <input id="signupEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+          <label for="signupPassword">Create a password</label>
+          <input id="signupPassword" name="password" type="password" autocomplete="new-password" placeholder="At least 8 characters" minlength="8" required />
+          <label for="signupPasswordConfirm">Confirm password</label>
+          <input id="signupPasswordConfirm" name="passwordConfirm" type="password" autocomplete="new-password" placeholder="Repeat your password" minlength="8" required />
+          <button type="submit">Create Pulse account</button>
+        </form>
+        <button class="auth-switch" id="authSwitch" type="button">New to Pulse? Create an account</button>
       </div>
 
     </header>
