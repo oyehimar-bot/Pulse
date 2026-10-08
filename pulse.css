@@ -339,7 +339,7 @@ a {
   background: rgba(5, 150, 105, 0.95);
 }
 
-.signup-form[hidden] {
+.signin-form[hidden] {
   display: none;
 }
 
