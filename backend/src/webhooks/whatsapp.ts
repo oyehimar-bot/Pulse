@@ -3,6 +3,18 @@ import type { FastifyInstance } from "fastify";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { AppConfig } from "../config.js";
 import { consumeWhatsAppProof } from "../auth/service.js";
+import {
+  buildDraftReply,
+  clearSellerDraft,
+  confirmSellerDraft,
+  getDraftStage,
+  getSellerDraft,
+  markDraftAwaitingVerification,
+  nextDraftPrompt,
+  parseDealDraftText,
+  setSellerDraft
+} from "../deals/drafting.js";
+import { WhatsAppSender } from "../whatsapp/sender.js";
 
 const graphApiBase = "https://graph.facebook.com";
 const verifyQuerySchema = {
@@ -105,14 +117,47 @@ async function findActiveDeal(prisma: PrismaClient, phone: string, userId?: stri
 async function processMessage(
   prisma: PrismaClient,
   config: AppConfig,
-  event: { id: string; payload: Prisma.JsonValue }
+  event: { id: string; payload: Prisma.JsonValue },
+  sender: WhatsAppSender
 ) {
   const queued = event.payload as unknown as { kind: "message"; value: MetaMessage };
   const incoming = queued.value;
   const phone = normalizePhone(incoming.from);
   const body = messageBody(incoming);
 
-  if (/^\d{6}$/.test(body)) await consumeWhatsAppProof(prisma, config, phone, body);
+  if (/^\d{6}$/.test(body)) {
+    await consumeWhatsAppProof(prisma, config, phone, body);
+  }
+
+  const currentDraft = getSellerDraft(phone);
+  const stage = getDraftStage(phone);
+
+  if (body.includes("deal_confirm")) {
+    if (currentDraft) {
+      markDraftAwaitingVerification(phone);
+      await sender.sendText(phone, nextDraftPrompt());
+    }
+  } else if (body.includes("deal_edit")) {
+    clearSellerDraft(phone);
+    await sender.sendText(phone, "Please send the corrected deal message and I’ll refresh the draft.");
+  } else if (stage === "AWAITING_VERIFICATION") {
+    const phrase = body.trim().toUpperCase() === "SKIP" ? null : body.trim() || null;
+    const createdDeal = await confirmSellerDraft(prisma, phone, phrase);
+    if (createdDeal) {
+      await sender.sendText(phone, `Deal ${createdDeal.dealCode} is saved as a draft and ready to continue.`);
+    } else {
+      await sender.sendText(phone, "I couldn’t save that draft. Please send the deal message again to start a fresh draft.");
+    }
+  } else {
+    const parsedDraft = await parseDealDraftText(body);
+    if (parsedDraft) {
+      setSellerDraft(phone, parsedDraft);
+      await sender.sendReplyButtons(phone, buildDraftReply(parsedDraft), [
+        { id: "deal_confirm", title: "Confirm Deal" },
+        { id: "deal_edit", title: "Edit Deal" }
+      ]);
+    }
+  }
 
   const user = await prisma.user.findUnique({ where: { phone }, select: { id: true } });
   const deal = await findActiveDeal(prisma, phone, user?.id);
@@ -153,7 +198,7 @@ async function processStatus(prisma: PrismaClient, event: { payload: Prisma.Json
   }
 }
 
-export async function processPendingMetaEvents(prisma: PrismaClient, config: AppConfig): Promise<void> {
+export async function processPendingMetaEvents(prisma: PrismaClient, config: AppConfig, sender = new WhatsAppSender(prisma, config)): Promise<void> {
   const events = await prisma.webhookEvent.findMany({
     where: { source: "META", processedAt: null, processingError: null },
     orderBy: { receivedAt: "asc" },
@@ -163,7 +208,7 @@ export async function processPendingMetaEvents(prisma: PrismaClient, config: App
   for (const event of events) {
     try {
       const payload = event.payload as unknown as { kind: string };
-      if (payload.kind === "message") await processMessage(prisma, config, event);
+      if (payload.kind === "message") await processMessage(prisma, config, event, sender);
       else if (payload.kind === "status") await processStatus(prisma, event);
       await prisma.webhookEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } });
     } catch (error) {
@@ -174,6 +219,7 @@ export async function processPendingMetaEvents(prisma: PrismaClient, config: App
 }
 
 export function registerWhatsAppWebhook(app: FastifyInstance, prisma: PrismaClient, config: AppConfig) {
+  const sender = new WhatsAppSender(prisma, config);
   let workerScheduled = false;
   const recoveryTimer = setInterval(() => scheduleWorker(), 1500);
   recoveryTimer.unref();
@@ -183,7 +229,7 @@ export function registerWhatsAppWebhook(app: FastifyInstance, prisma: PrismaClie
     if (workerScheduled) return;
     workerScheduled = true;
     setImmediate(() => {
-      void processPendingMetaEvents(prisma, config).catch(() => {
+      void processPendingMetaEvents(prisma, config, sender).catch(() => {
         app.log.error("WhatsApp webhook worker failed; pending events will be retried.");
       }).finally(() => {
         workerScheduled = false;
