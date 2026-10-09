@@ -13,6 +13,9 @@ type DraftStage = "AWAITING_CONFIRMATION" | "AWAITING_VERIFICATION";
 
 const activeDrafts = new Map<string, DealDraft>();
 const draftStages = new Map<string, DraftStage>();
+const buyerDecisionMap = new Map<string, string>();
+
+export const DEAL_SHARE_NUMBER = "15556546846";
 
 export function normalizePhoneNumber(phone: string): string {
   const digits = phone.replace(/\D/g, "");
@@ -46,6 +49,30 @@ export function clearSellerDraft(sellerPhone: string) {
   const normalized = normalizePhoneNumber(sellerPhone);
   activeDrafts.delete(normalized);
   draftStages.delete(normalized);
+}
+
+export function setBuyerDecisionContext(phone: string, dealCode: string) {
+  buyerDecisionMap.set(normalizePhoneNumber(phone), dealCode);
+}
+
+export function getBuyerDecisionContext(phone: string): string | undefined {
+  return buyerDecisionMap.get(normalizePhoneNumber(phone));
+}
+
+export function clearBuyerDecisionContext(phone: string) {
+  buyerDecisionMap.delete(normalizePhoneNumber(phone));
+}
+
+export function buildDealShareLink(code: string): string {
+  return `https://wa.me/${DEAL_SHARE_NUMBER}?text=DEAL-${code.toUpperCase()}`;
+}
+
+export function createShortDealCode(): string {
+  let code = "";
+  do {
+    code = randomBytes(5).toString("base64url").replace(/[-_]/g, "").slice(0, 8).toUpperCase();
+  } while (!/^[A-Z0-9]{6,8}$/.test(code));
+  return code;
 }
 
 function parseRegexDraft(rawText: string): DealDraft | null {
@@ -149,6 +176,31 @@ export function buildDraftReply(draft: DealDraft): string {
   ].join("\n");
 }
 
+export function buildDealSummaryText(
+  items: string,
+  rightsText: string,
+  amountKobo: bigint,
+  buyerPhone: string
+): string {
+  const amountNaira = Number(amountKobo) / 100;
+  return [
+    "Deal summary",
+    `Items: ${items}`,
+    `Rights: ${rightsText}`,
+    `Amount: ${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 2 }).format(amountNaira)}`,
+    `Buyer: ${buyerPhone}`
+  ].join("\n");
+}
+
+export function buildSellerShareMessage(draft: DealDraft, dealCode: string): string {
+  return [
+    buildDealSummaryText(`${draft.quantity} ${draft.itemDescription}`, draft.rightsText, draft.amountKobo, draft.buyerPhone),
+    "",
+    buildDealShareLink(dealCode),
+    "Share this link in your existing chat with your buyer. They tap it, message Pulse, and the deal opens for them."
+  ].join("\n");
+}
+
 export async function confirmSellerDraft(prisma: PrismaClient, sellerPhone: string, verificationPhrase?: string | null) {
   const draft = getSellerDraft(sellerPhone);
   if (!draft) return null;
@@ -162,18 +214,21 @@ export async function confirmSellerDraft(prisma: PrismaClient, sellerPhone: stri
   const buyerPhone = normalizePhoneNumber(draft.buyerPhone);
   const buyer = await prisma.user.upsert({
     where: { phone: buyerPhone },
-    update: {},
+    update: { isBuyer: true },
     create: {
       phone: buyerPhone,
       pulseId: `PULSE-${randomBytes(4).toString("hex").toUpperCase()}`,
       displayName: "Buyer",
       isBuyer: true,
-      isPhoneVerified: true,
+      isPhoneVerified: false,
       verificationPhrase: "Not set"
     }
   });
 
-  const dealCode = `PULSE-${randomBytes(3).toString("hex").toUpperCase()}`;
+  let dealCode = createShortDealCode();
+  while (await prisma.deal.findUnique({ where: { dealCode } })) {
+    dealCode = createShortDealCode();
+  }
 
   const created = await prisma.deal.create({
     data: {
@@ -185,12 +240,13 @@ export async function confirmSellerDraft(prisma: PrismaClient, sellerPhone: stri
       items: [{ description: draft.itemDescription, quantity: draft.quantity }],
       rightsText: draft.rightsText,
       amountKobo: draft.amountKobo,
-      status: "DRAFT",
+      status: "AWAITING_BUYER",
+      buyerVerifiedOnPulse: buyer.isPhoneVerified,
       verificationPhrase: verificationPhrase && verificationPhrase.trim().toUpperCase() !== "SKIP" ? verificationPhrase.trim() : null,
       events: {
         create: {
           type: "DEAL_CREATED",
-          toStatus: "DRAFT",
+          toStatus: "AWAITING_BUYER",
           actorId: seller.id,
           data: { source: "chat_draft" }
         }

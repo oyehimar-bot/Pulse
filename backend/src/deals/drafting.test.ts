@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildDealShareLink,
   clearSellerDraft,
   getSellerDraft,
   parseDealDraftText,
@@ -34,4 +35,8 @@ test("deal drafts are kept in memory by seller phone with only one active draft"
 
   clearSellerDraft(sellerPhone);
   assert.equal(getSellerDraft(sellerPhone), undefined);
+});
+
+test("deal links use the required wa.me share format", () => {
+  assert.equal(buildDealShareLink("ABCD1234"), "https://wa.me/15556546846?text=DEAL-ABCD1234");
 });

@@ -112,6 +112,7 @@ model Deal {
   sellerId           String       @map("seller_id")
   buyerId            String?      @map("buyer_id")
   buyerPhone         String?      @map("buyer_phone")
+  buyerVerifiedOnPulse Boolean     @default(false) @map("buyer_verified_on_pulse")
   description        String       @db.Text
   items              Json
   rightsText         String       @map("rights_text") @db.Text

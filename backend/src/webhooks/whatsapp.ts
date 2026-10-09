@@ -4,16 +4,23 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import type { AppConfig } from "../config.js";
 import { consumeWhatsAppProof } from "../auth/service.js";
 import {
+  buildDealSummaryText,
   buildDraftReply,
+  buildSellerShareMessage,
+  clearBuyerDecisionContext,
   clearSellerDraft,
   confirmSellerDraft,
+  getBuyerDecisionContext,
   getDraftStage,
   getSellerDraft,
   markDraftAwaitingVerification,
   nextDraftPrompt,
+  normalizePhoneNumber,
   parseDealDraftText,
+  setBuyerDecisionContext,
   setSellerDraft
 } from "../deals/drafting.js";
+import { transitionDeal } from "../deals/transitions.js";
 import { WhatsAppSender } from "../whatsapp/sender.js";
 
 const graphApiBase = "https://graph.facebook.com";
@@ -131,22 +138,108 @@ async function processMessage(
 
   const currentDraft = getSellerDraft(phone);
   const stage = getDraftStage(phone);
+  const buyerDecisionCode = getBuyerDecisionContext(phone);
 
-  if (body.includes("deal_confirm")) {
+  if (body.toLowerCase().includes("accept_deal") || body.toLowerCase().includes("decline_deal")) {
+    const fallbackDeal = buyerDecisionCode ? null : await prisma.deal.findFirst({
+      where: { buyerPhone: phone, status: "AWAITING_BUYER" },
+      select: { dealCode: true },
+      orderBy: { createdAt: "desc" }
+    });
+    const pendingCode = buyerDecisionCode ?? fallbackDeal?.dealCode;
+    if (!pendingCode) {
+      await sender.sendText(phone, "That deal is no longer open for buyer entry. Ask the seller for a fresh link.");
+    } else {
+      const pendingDeal = await prisma.deal.findFirst({
+        where: { dealCode: pendingCode, status: "AWAITING_BUYER" },
+        include: { seller: true }
+      });
+      if (!pendingDeal) {
+        await sender.sendText(phone, "That deal is no longer open for buyer entry. Ask the seller for a fresh link.");
+      } else {
+        const buyerUser = await prisma.user.findUnique({ where: { phone }, select: { id: true, isPhoneVerified: true } });
+        const nextStatus = body.toLowerCase().includes("accept_deal") ? "AWAITING_PAYMENT" : "EXPIRED";
+        await prisma.deal.update({
+          where: { id: pendingDeal.id },
+          data: {
+            buyerPhone: phone,
+            buyerId: buyerUser?.id ?? pendingDeal.buyerId ?? null,
+            buyerVerifiedOnPulse: buyerUser?.isPhoneVerified ?? false,
+          }
+        });
+        await transitionDeal(prisma, {
+          dealId: pendingDeal.id,
+          to: nextStatus,
+          ...(buyerUser?.id ? { actorId: buyerUser.id } : {}),
+          data: { source: "buyer_decision" }
+        });
+        clearBuyerDecisionContext(phone);
+        const sellerMessage = nextStatus === "AWAITING_PAYMENT"
+          ? `${pendingDeal.seller.displayName ?? "Your seller"} saw the deal accepted and it is moving to payment.`
+          : `${pendingDeal.seller.displayName ?? "Your seller"} saw the deal declined and it is now closed.`;
+        await sender.sendText(pendingDeal.seller.phone, sellerMessage);
+      }
+    }
+  } else if (/^DEAL-[A-Z0-9]{6,8}$/i.test(body)) {
+    const normalizedCode = body.trim().replace(/^DEAL-/i, "").toUpperCase();
+    const deal = await prisma.deal.findFirst({
+      where: { dealCode: normalizedCode, status: "AWAITING_BUYER" },
+      include: { seller: true }
+    });
+
+    if (!deal) {
+      await sender.sendText(phone, "That deal link is not open or has already moved past buyer entry. Ask the seller for a fresh link.");
+    } else {
+      const buyerUser = await prisma.user.findUnique({ where: { phone }, select: { id: true, isPhoneVerified: true } });
+      const buyerPhone = normalizePhoneNumber(phone);
+      const updated = await prisma.deal.update({
+        where: { id: deal.id },
+        data: {
+          buyerPhone,
+          buyerId: buyerUser?.id ?? deal.buyerId ?? null,
+          buyerVerifiedOnPulse: buyerUser?.isPhoneVerified ?? false,
+        }
+      });
+
+      const itemSummary = Array.isArray(updated.items) ? updated.items.map((item) => {
+        const record = item as { description?: string; quantity?: number };
+        return `${record.quantity ?? 1} ${record.description ?? "item"}`;
+      }).join(", ") : `${updated.description}`;
+
+      const buyerMessage = [
+        `Seller: ${deal.seller.displayName ?? "Pulse seller"} (${deal.seller.pulseId})`,
+        ...(deal.verificationPhrase ? ["Your seller said you'd recognize this phrase.", deal.verificationPhrase] : []),
+        buildDealSummaryText(itemSummary, deal.rightsText, deal.amountKobo, buyerPhone),
+        ""
+      ].join("\n");
+
+      setBuyerDecisionContext(phone, deal.dealCode);
+      await sender.sendReplyButtons(phone, buyerMessage, [
+        { id: "accept_deal", title: "Accept Deal" },
+        { id: "decline_deal", title: "Decline Deal" }
+      ]);
+    }
+  } else if (body.includes("deal_confirm")) {
     if (currentDraft) {
       markDraftAwaitingVerification(phone);
       await sender.sendText(phone, nextDraftPrompt());
     }
   } else if (body.includes("deal_edit")) {
     clearSellerDraft(phone);
-    await sender.sendText(phone, "Please send the corrected deal message and I’ll refresh the draft.");
+    await sender.sendText(phone, "Please send the corrected deal message and I will refresh the draft.");
   } else if (stage === "AWAITING_VERIFICATION") {
     const phrase = body.trim().toUpperCase() === "SKIP" ? null : body.trim() || null;
     const createdDeal = await confirmSellerDraft(prisma, phone, phrase);
     if (createdDeal) {
-      await sender.sendText(phone, `Deal ${createdDeal.dealCode} is saved as a draft and ready to continue.`);
+      const draft = getSellerDraft(phone);
+      const shareDraft = draft ?? currentDraft;
+      if (shareDraft) {
+        await sender.sendText(phone, buildSellerShareMessage(shareDraft, createdDeal.dealCode));
+      } else {
+        await sender.sendText(phone, `Deal ${createdDeal.dealCode} is ready to share with your buyer.`);
+      }
     } else {
-      await sender.sendText(phone, "I couldn’t save that draft. Please send the deal message again to start a fresh draft.");
+      await sender.sendText(phone, "I could not save that draft. Please send the deal message again to start a fresh draft.");
     }
   } else {
     const parsedDraft = await parseDealDraftText(body);
