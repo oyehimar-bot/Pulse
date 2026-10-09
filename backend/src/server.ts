@@ -9,7 +9,7 @@ loadDotEnv({ path: resolve(process.cwd(), "../.env") });
 async function start() {
   const config = loadConfig();
   const prisma = new PrismaClient();
-  const app = buildApp(config, prisma);
+  const app = await buildApp(config, prisma);
 
   try {
     await app.listen({ host: "0.0.0.0", port: config.PORT });

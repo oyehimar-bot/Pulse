@@ -2,6 +2,7 @@ import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import { PrismaClient } from "@prisma/client";
 import Fastify from "fastify";
+import rawBody from "fastify-raw-body";
 import { z } from "zod";
 import {
   AuthRateLimitError,
@@ -12,6 +13,7 @@ import {
   issueChallengeSession
 } from "./auth/service.js";
 import type { AppConfig } from "./config.js";
+import { registerWhatsAppWebhook } from "./webhooks/whatsapp.js";
 
 const phoneSchema = z.string().regex(/^\+[1-9]\d{7,14}$/, "Enter a phone number in international format, for example +2348012345678.");
 const challengeSchema = z.object({
@@ -36,18 +38,14 @@ function cookieValue(config: AppConfig, token: string, expiresAt: Date) {
   return `${sessionCookieName}=${token}; ${cookieAttributes(config)}; Expires=${expiresAt.toUTCString()}`;
 }
 
-export function buildApp(config: AppConfig, prisma = new PrismaClient()) {
+export async function buildApp(config: AppConfig, prisma = new PrismaClient()) {
   const app = Fastify({ logger: true });
 
-  app.removeContentTypeParser("application/json");
-  app.addContentTypeParser("application/json", { parseAs: "buffer" }, (request, body, done) => {
-    const rawBody = Buffer.isBuffer(body) ? body : Buffer.from(body);
-    request.rawBody = rawBody;
-    try {
-      done(null, JSON.parse(rawBody.toString("utf8")));
-    } catch (error) {
-      done(error as Error);
-    }
+  await app.register(rawBody, {
+    field: "rawBody",
+    global: false,
+    encoding: "utf8",
+    runFirst: true
   });
 
   app.addHook("onClose", async () => prisma.$disconnect());
@@ -108,6 +106,8 @@ export function buildApp(config: AppConfig, prisma = new PrismaClient()) {
     await deleteSession(prisma, token);
     return reply.header("Set-Cookie", `${sessionCookieName}=; ${cookieAttributes(config)}; Max-Age=0`).code(204).send();
   });
+
+  registerWhatsAppWebhook(app, prisma, config);
 
   return app;
 }
