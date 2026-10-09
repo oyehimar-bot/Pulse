@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+backend/prisma/*.db
+backend/prisma/*.db-journal
+backend/storage/
+*.log
+.DS_Store
