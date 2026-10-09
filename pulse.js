@@ -82,12 +82,40 @@ document.addEventListener("click", () => {
   setSignInOpen(false);
 });
 
+function startSession(fields) {
+  const session = {
+    name: fields.name || "",
+    email: fields.email || "",
+    startedAt: Date.now(),
+  };
+
+  try {
+    localStorage.setItem("pulse.session", JSON.stringify(session));
+  } catch (error) {
+    /* private mode — still continue into the workspace */
+  }
+
+  window.location.href = "dashboard.html";
+}
+
 signInForm.addEventListener("submit", (event) => {
   event.preventDefault();
+
+  const email = signInForm.elements.email.value.trim();
+
+  startSession({
+    name: email.split("@")[0],
+    email,
+  });
 });
 
 signUpForm.addEventListener("submit", (event) => {
   event.preventDefault();
+
+  startSession({
+    name: signUpForm.elements.name.value.trim(),
+    email: signUpForm.elements.email.value.trim(),
+  });
 });
 
 

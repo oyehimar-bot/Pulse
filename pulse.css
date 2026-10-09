@@ -24,7 +24,7 @@
   --bg-midnight-lift: #F5F3EE;
   --bg-midnight-lift-deep: #E7E5DF;
   --surface-card: rgba(250, 249, 245, 0.76);
-  --text-white: #172033;
+  --text-white: #f2f3f5;
   --text-muted: #526078;
 
   /* Derived, palette-only effects (alpha layers of the tokens above) */
