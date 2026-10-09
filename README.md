@@ -20,6 +20,8 @@ Pulse is a WhatsApp escrow and digital licensing demo. The repository keeps the 
 
 Run focused backend tests with `npm test`.
 
+To run the database-backed auth integration test, set `TEST_DATABASE_URL` to an isolated PostgreSQL test database and run `npm test`. Do not point it at production data. The test creates and deletes test accounts.
+
 The API listens on `http://localhost:3000` by default and the Vite client on `http://localhost:5173`. The API's liveness endpoint is `GET /health`.
 
 All listed environment variables except `ANTHROPIC_API_KEY` are required at API startup. `WHATSAPP_API_VERSION`, `PAYAZA_TENANT_ID`, `ESCROW_FEE_PERCENT`, and `LICENSE_FEE_KOBO` default to `v25.0`, `test`, `2.5`, and `50000` respectively. Session and license signing keys must each be at least 32 characters. Never commit `.env` or share test credentials.
@@ -32,4 +34,6 @@ Meta must reach the local API over HTTPS. Start a tunnel such as Cloudflare Tunn
 
 ## Current scope
 
-Phase 0 provides the service and client scaffold. Phase 1 adds the PostgreSQL schema and seed data. External payment and WhatsApp calls are not implemented in these phases.
+Phase 0 provides the service and client scaffold. Phase 1 adds the PostgreSQL schema and seed data. Phase 2 adds `POST /auth/challenges`, `GET /auth/challenges/:challengeId`, `GET /auth/me`, and `POST /auth/logout`. Challenge creation returns a six-digit code for the user to send to Pulse, and status polling establishes an HTTP-only cookie session after the WhatsApp proof is accepted.
+
+The proof consumer is implemented in the backend for the Phase 3 Meta webhook to call after signature verification. Until Phase 3 is built and configured with Meta test credentials, the WhatsApp code round trip is not connected. There are no mock webhook endpoints or fake WhatsApp messages.

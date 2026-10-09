@@ -4,7 +4,7 @@ Updated: 2026-10-09
 
 ## Current checkpoint
 
-Phase 0 and Phase 1 implementation and local verification are complete. Phases 2 through 10 have not started. No Meta WhatsApp or Payaza integration has been attempted, and no external calls are mocked.
+Phase 0, Phase 1, and the Phase 2 auth implementation are complete and locally verified. Phases 3 through 10 have not started. No Meta WhatsApp or Payaza integration has been attempted, and no external calls are mocked.
 
 ## Built so far
 
@@ -27,6 +27,16 @@ Phase 0 and Phase 1 implementation and local verification are complete. Phases 2
 - Added ledger append and account-balance helpers. Balances are derived from signed append-only entries.
 - Added an idempotent seed script for a demo seller, buyer, and draft deal.
 
+### Phase 2: Auth with WhatsApp proof
+
+- Added persisted, short-lived auth challenges with six-digit codes stored only as keyed hashes.
+- Added request limits of three challenges per phone and ten per requester IP per 15-minute window, plus a five-wrong-code lockout per challenge.
+- Added endpoints to request a challenge, poll proof status, read the current cookie session, and log out.
+- Added proof consumption for an international sender phone. It verifies an existing account in place or creates a phone-verified account after successful proof.
+- Added a seven-day random session token stored only as a SHA-256 hash in PostgreSQL and returned only in an HTTP-only cookie.
+- Added the signup/login wireframe flow with WhatsApp link, displayed code, polling, expiry/lockout feedback, account state, and logout.
+- Exported the proof consumer for Phase 3's signature-verified Meta webhook. No fake incoming-message route was added.
+
 ## Verification so far
 
 - Prisma client generation and schema validation passed with matching Prisma CLI/client 6.19.0.
@@ -39,6 +49,9 @@ Phase 0 and Phase 1 implementation and local verification are complete. Phases 2
 - The disposable API process and PostgreSQL cluster were stopped and removed after testing.
 - `.env` ignore behavior was confirmed with `git check-ignore`.
 - An offline npm audit reported zero vulnerabilities. A fresh registry audit could not be obtained because the npm registry was unreachable.
+- Phase 2 migration deployed successfully to a fresh disposable PostgreSQL 18 database.
+- Database-backed auth tests passed for new signup, existing-account login, wrong sender/code, one-time code consumption, cookie session, logout, expiry, phone/IP throttling, and five-attempt lockout.
+- Phase 2 typecheck, ESLint, production builds, schema validation, and all backend tests passed.
 
 ## Open Phase 0/1 work
 
@@ -46,10 +59,10 @@ Phase 0 and Phase 1 implementation and local verification are complete. Phases 2
 - Add focused automated tests for allowed and rejected deal transitions and ledger balance derivation. Database persistence constraints have been exercised, but those service functions do not yet have dedicated tests.
 - Recheck dependency advisories against the npm registry when network access returns. An earlier online audit reported four high findings in Prisma's development CLI dependency tree and suggested Prisma 6.12.0. Registry access failed during the update attempt, so CLI/client remain consistently pinned at 6.19.0.
 - Confirm README commands from a fresh clone/install with the project's real PostgreSQL connection details.
+- Complete the real WhatsApp proof loop in Phase 3 by passing verified inbound Meta messages to the exported proof consumer. The Phase 2 UI cannot receive a WhatsApp proof until that webhook exists.
 
 ## Remaining phases
 
-- **Phase 2: Auth with WhatsApp proof.** Phone signup/login, one-time proof code, expiry and rate limits, webhook confirmation, and cookie sessions.
 - **Phase 3: WhatsApp channel.** Meta verification and signature checking, webhook deduplication and quick acknowledgement, background processing, message send types, inbound routing, and surfaced delivery failures.
 - **Phase 4: Deal drafting.** Structured Anthropic parsing when configured, exact-format fallback, editable draft confirmation, and optional buyer verification phrase.
 - **Phase 5: Buyer entry.** Confirmed deal creation, unique deal code and `wa.me` link, buyer-initiated join, and deal acceptance or decline.
@@ -70,4 +83,4 @@ Phase 0 and Phase 1 implementation and local verification are complete. Phases 2
 - The API is intended to run on port 3000 and Vite on port 5173 by default.
 - Prisma CLI and client are set to 6.19.0 and lockfile installation/generation has been verified. The attempted switch to audit-suggested 6.12.0 could not install because the npm registry was unreachable. Recheck the development dependency audit when registry access is available.
 - A workspace sorter moved the pre-existing prototype files from the repository root into `save/`. Those files remain present there. This build did not intentionally edit or delete the prototypes; their relocation appears in Git as deletions at the old paths and an untracked `save/` directory.
-- There is no real payment flow, WhatsApp conversation flow, authentication flow, or license issuance yet. The frontend is only a temporary connection-status shell.
+- There is no connected Meta webhook, outbound WhatsApp message, payment flow, deal conversation, or license issuance yet. Auth challenge/session plumbing is implemented, but the actual WhatsApp proof round trip awaits Phase 3.
