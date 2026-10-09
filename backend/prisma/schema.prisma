@@ -1,0 +1,233 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DealStatus {
+  DRAFT
+  AWAITING_BUYER
+  AWAITING_PAYMENT
+  FUNDED
+  DELIVERED
+  RELEASED
+  DISPUTED
+  REFUNDED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum WebhookSource {
+  META
+  PAYAZA
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum LedgerDirection {
+  CREDIT
+  DEBIT
+}
+
+model User {
+  id                   String        @id @default(cuid())
+  displayName          String?       @map("display_name")
+  phone                String        @unique
+  pulseId              String        @unique @map("pulse_id")
+  isSeller             Boolean       @default(false) @map("is_seller")
+  isBuyer              Boolean       @default(false) @map("is_buyer")
+  isPhoneVerified      Boolean       @default(false) @map("is_phone_verified")
+  verificationPhrase   String        @default("Not set") @map("verification_phrase")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  sessions             Session[]
+  sellerDeals          Deal[]        @relation("SellerDeals")
+  buyerDeals           Deal[]        @relation("BuyerDeals")
+  messages             Message[]
+
+  @@index([phone, isPhoneVerified])
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique @map("token_hash")
+  userId    String   @map("user_id")
+  challengeId String? @unique @map("challenge_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge AuthChallenge? @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model AuthChallenge {
+  id             String   @id
+  phone          String
+  displayName    String?  @map("display_name")
+  codeHash       String   @map("code_hash")
+  requesterHash  String   @map("requester_hash")
+  attempts       Int      @default(0)
+  expiresAt      DateTime @map("expires_at")
+  verifiedAt     DateTime? @map("verified_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  session        Session?
+
+  @@index([phone, expiresAt, verifiedAt])
+  @@index([requesterHash, createdAt])
+  @@map("auth_challenges")
+}
+
+model AuthRateLimitBucket {
+  id         String   @id @default(cuid())
+  scope      String
+  keyHash    String   @map("key_hash")
+  bucketStart DateTime @map("bucket_start")
+  count      Int      @default(0)
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([scope, keyHash, bucketStart])
+  @@index([bucketStart])
+  @@map("auth_rate_limit_buckets")
+}
+
+model Deal {
+  id                 String       @id @default(cuid())
+  dealCode           String       @unique @map("deal_code")
+  sellerId           String       @map("seller_id")
+  buyerId            String?      @map("buyer_id")
+  buyerPhone         String?      @map("buyer_phone")
+  description        String       @db.Text
+  items              Json
+  rightsText         String       @map("rights_text") @db.Text
+  amountKobo         BigInt       @map("amount_kobo")
+  status             DealStatus   @default(DRAFT)
+  verificationPhrase String?      @map("verification_phrase") @db.Text
+  expiresAt          DateTime?    @map("expires_at")
+  deliveredAt        DateTime?    @map("delivered_at")
+  releasedAt         DateTime?    @map("released_at")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  seller             User         @relation("SellerDeals", fields: [sellerId], references: [id], onDelete: Restrict)
+  buyer              User?        @relation("BuyerDeals", fields: [buyerId], references: [id], onDelete: SetNull)
+  events             DealEvent[]
+  ledgerEntries      LedgerEntry[]
+  payments           Payment[]
+  messages           Message[]
+  license            License?
+
+  @@index([sellerId, status, createdAt])
+  @@index([buyerId, status, createdAt])
+  @@index([buyerPhone])
+  @@index([status, expiresAt])
+  @@map("deals")
+}
+
+model DealEvent {
+  id        String   @id @default(cuid())
+  dealId    String   @map("deal_id")
+  type      String
+  fromStatus DealStatus? @map("from_status")
+  toStatus  DealStatus? @map("to_status")
+  actorId   String?  @map("actor_id")
+  messageId String?  @map("message_id")
+  data      Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Restrict)
+
+  @@index([dealId, createdAt])
+  @@index([type, createdAt])
+  @@map("deal_events")
+}
+
+model LedgerEntry {
+  id          String         @id @default(cuid())
+  account     String
+  direction   LedgerDirection
+  amountKobo  BigInt         @map("amount_kobo")
+  dealId      String         @map("deal_id")
+  reason      String
+  createdAt   DateTime       @default(now()) @map("created_at")
+  deal        Deal           @relation(fields: [dealId], references: [id], onDelete: Restrict)
+
+  @@index([account, createdAt])
+  @@index([dealId, createdAt])
+  @@map("ledger_entries")
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  dealId           String        @map("deal_id")
+  providerReference String        @unique @map("provider_reference")
+  status           PaymentStatus @default(PENDING)
+  amountKobo       BigInt        @map("amount_kobo")
+  rawPayload       Json?         @map("raw_payload")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  deal             Deal          @relation(fields: [dealId], references: [id], onDelete: Restrict)
+
+  @@index([dealId, status])
+  @@map("payments")
+}
+
+model WebhookEvent {
+  id         String        @id @default(cuid())
+  source     WebhookSource
+  externalId String        @map("external_id")
+  payload    Json
+  receivedAt DateTime      @default(now()) @map("received_at")
+  processedAt DateTime?    @map("processed_at")
+  processingError String?  @map("processing_error") @db.Text
+
+  @@unique([source, externalId])
+  @@index([source, receivedAt])
+  @@index([processedAt, receivedAt])
+  @@map("webhook_events")
+}
+
+model Message {
+  id            String          @id @default(cuid())
+  direction     MessageDirection
+  whatsappId    String?         @unique @map("whatsapp_id")
+  senderPhone   String          @map("sender_phone")
+  userId        String?         @map("user_id")
+  dealId        String?         @map("deal_id")
+  body          String          @db.Text
+  sentAt        DateTime        @default(now()) @map("sent_at")
+  deliveryError String?         @map("delivery_error") @db.Text
+  user          User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  deal          Deal?           @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  @@index([senderPhone, sentAt])
+  @@index([dealId, sentAt])
+  @@index([userId, sentAt])
+  @@map("messages")
+}
+
+model License {
+  id                String   @id @default(cuid())
+  dealId            String   @unique @map("deal_id")
+  certificateNumber String   @unique @map("certificate_number")
+  sha256Hash        String   @map("sha256_hash")
+  filePath          String   @map("file_path")
+  createdAt         DateTime @default(now()) @map("created_at")
+  deal              Deal     @relation(fields: [dealId], references: [id], onDelete: Restrict)
+
+  @@index([sha256Hash])
+  @@map("licenses")
+}
