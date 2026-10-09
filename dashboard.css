@@ -1,6 +1,7 @@
 /* =========================================================
-   1. DESIGN TOKENS — OFFICIAL PULSE PALETTE (verbatim :root,
-      identical to pulse.css — colors rhyme with the landing page)
+   1. DESIGN TOKENS — OFFICIAL PULSE PALETTE (matches pulse.css
+      verbatim, except the documented --text-white override below;
+      colors rhyme with the landing page)
 ========================================================= */
 
 :root {
@@ -25,6 +26,11 @@
   --bg-midnight-lift: #F5F3EE;
   --bg-midnight-lift-deep: #E7E5DF;
   --surface-card: rgba(250, 249, 245, 0.76);
+  /* NOTE: the landing page repurposed --text-white as dark ink
+     (#121720cc) for its light canvas. Every dashboard use of this
+     token sits on a dark surface (ink sidebar, solid buttons,
+     outgoing bubbles, badges), so the light value is kept here on
+     purpose — syncing it would render dark-on-dark. */
   --text-white: #f2f3f5;
   --text-muted: #526078;
 
@@ -287,18 +293,9 @@ svg {
   text-align: center;
 }
 
-.side-count.accent {
-  background: var(--pulse-blue-primary);
-}
-
 .side-item.active .side-count {
   background: rgba(23, 32, 51, 0.18);
   color: var(--ink);
-}
-
-.side-item.active .side-count.accent {
-  background: var(--pulse-blue-dark);
-  color: var(--text-white);
 }
 
 /* ---------- Sidebar vault card ---------- */
@@ -1542,40 +1539,27 @@ svg {
   color: var(--stable-green-dark);
 }
 
-.thread-composer {
+.thread-note {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 9px;
 
-  margin: 0 24px 22px;
-  padding: 11px 14px;
+  margin: 2px 24px 20px;
+  padding-top: 14px;
 
-  border: 1px solid var(--hairline-strong);
-  border-radius: 999px;
+  border-top: 1px dashed var(--hairline-strong);
 
-  background: var(--bg-midnight-lift);
-
-  color: rgba(82, 96, 120, 0.7);
-  font-size: 11.5px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
 }
 
-.thread-composer .send {
-  display: grid;
-  place-items: center;
+.thread-note svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
 
-  width: 28px;
-  height: 28px;
-  margin-left: auto;
-
-  border-radius: 50%;
-
-  background: var(--pulse-blue-primary);
-  color: var(--text-white);
-}
-
-.thread-composer .send svg {
-  width: 13px;
-  height: 13px;
+  color: var(--stable-green-dark);
 }
 
 /* ---------- Activity feed ---------- */
@@ -1993,327 +1977,7 @@ svg {
 
 
 /* =========================================================
-   10. CHATS
-========================================================= */
-
-.view-flush {
-  margin: -34px;
-}
-
-.chat-split {
-  display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-
-  min-height: calc(100vh - 44px - 84px - 68px);
-
-  background: var(--paper);
-}
-
-.chat-list-panel {
-  border-right: 1px solid var(--hairline);
-
-  background: var(--bg-midnight-lift);
-
-  display: flex;
-  flex-direction: column;
-}
-
-.chat-list-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  padding: 22px 20px 16px;
-
-  border-bottom: 1px solid var(--hairline);
-}
-
-.chip.soft::before {
-  animation: none;
-}
-
-.chat-list {
-  list-style: none;
-
-  overflow-y: auto;
-}
-
-.chat-list li {
-  position: relative;
-
-  display: flex;
-  align-items: center;
-  gap: 12px;
-
-  padding: 15px 20px;
-
-  border-bottom: 1px solid var(--hairline);
-
-  cursor: pointer;
-
-  transition: background 0.18s ease;
-}
-
-.chat-list li:hover {
-  background: var(--paper);
-}
-
-.chat-list li.on {
-  background: var(--paper);
-}
-
-.chat-list li.on::before {
-  content: "";
-
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-
-  width: 3px;
-
-  background: var(--pulse-blue-primary);
-}
-
-.chat-list img {
-  width: 38px;
-  height: 38px;
-  flex: none;
-
-  border-radius: 50%;
-
-  object-fit: cover;
-}
-
-.chat-list div {
-  flex: 1;
-  min-width: 0;
-}
-
-.chat-list strong {
-  display: block;
-
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-.chat-list small {
-  display: block;
-  margin-top: 2px;
-
-  color: var(--text-muted);
-  font-size: 10.5px;
-
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.chat-list time {
-  align-self: flex-start;
-
-  color: var(--text-muted);
-  font-size: 9px;
-  font-weight: 600;
-}
-
-.chat-list .badge {
-  position: absolute;
-  right: 18px;
-  bottom: 12px;
-
-  min-width: 17px;
-  height: 17px;
-  padding: 0 5px;
-
-  display: grid;
-  place-items: center;
-
-  border-radius: 99px;
-
-  background: var(--pulse-blue-primary);
-  color: var(--text-white);
-
-  font-size: 9px;
-  font-weight: 700;
-}
-
-/* ---------- Chat room ---------- */
-
-.chat-room {
-  display: flex;
-  flex-direction: column;
-
-  min-width: 0;
-
-  background: var(--bg-midnight-lift);
-}
-
-.chat-room-head {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-
-  padding: 16px 26px;
-
-  background: var(--paper);
-  border-bottom: 1px solid var(--hairline);
-}
-
-.chat-room-head img {
-  width: 40px;
-  height: 40px;
-
-  border-radius: 50%;
-
-  object-fit: cover;
-}
-
-.chat-room-head div {
-  flex: 1;
-  min-width: 0;
-}
-
-.chat-room-head strong {
-  display: block;
-
-  font-size: 13.5px;
-  font-weight: 600;
-}
-
-.chat-room-head small {
-  color: var(--text-muted);
-  font-size: 10.5px;
-}
-
-.chat-scroll {
-  flex: 1;
-
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-
-  padding: 26px;
-
-  max-height: 560px;
-
-  overflow-y: auto;
-}
-
-.chat-scroll .msg {
-  animation: bubbleIn 0.35s var(--ease);
-}
-
-@keyframes bubbleIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.chat-date {
-  align-self: center;
-
-  padding: 5px 14px;
-
-  border: 1px solid var(--hairline-strong);
-  border-radius: 999px;
-
-  background: var(--paper);
-
-  color: var(--text-muted);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.chat-input {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-
-  padding: 16px 26px;
-
-  background: var(--paper);
-  border-top: 1px solid var(--hairline);
-}
-
-.chat-input > button:first-child {
-  display: grid;
-  place-items: center;
-
-  width: 36px;
-  height: 36px;
-
-  border: 1px solid var(--hairline-strong);
-  border-radius: 50%;
-
-  color: var(--text-muted);
-}
-
-.chat-input > button:first-child svg {
-  width: 15px;
-  height: 15px;
-}
-
-.chat-input input {
-  flex: 1;
-  min-width: 0;
-
-  height: 42px;
-  padding: 0 18px;
-
-  border: 1px solid var(--hairline-strong);
-  border-radius: 999px;
-
-  outline: 0;
-
-  background: var(--bg-midnight-lift);
-
-  font-size: 12.5px;
-
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.chat-input input:focus {
-  border-color: var(--pulse-blue-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
-}
-
-.send-btn {
-  display: grid;
-  place-items: center;
-
-  width: 42px;
-  height: 42px;
-  flex: none;
-
-  border-radius: 50%;
-
-  background: var(--pulse-blue-primary);
-  color: var(--text-white);
-
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.send-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-.send-btn:hover {
-  background: var(--pulse-blue-dark);
-  transform: scale(1.05);
-}
-
-
-/* =========================================================
-   11. VAULT
+   10. VAULT
 ========================================================= */
 
 .vault-hero {
@@ -2568,7 +2232,7 @@ svg {
 
 
 /* =========================================================
-   12. CERTIFICATES
+   11. CERTIFICATES
 ========================================================= */
 
 .cert-intro {
@@ -2730,8 +2394,113 @@ svg {
 }
 
 
+/* ---------- Licence drafter ---------- */
+
+.draft-panel {
+  margin-bottom: 28px;
+  padding: 26px 26px 30px;
+
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 18px;
+
+  box-shadow: var(--shadow-flat);
+}
+
+.draft-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: 30px;
+
+  margin-top: 22px;
+  align-items: start;
+}
+
+.draft-form {
+  display: grid;
+  gap: 14px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field label {
+  color: var(--text-muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 11px 13px;
+
+  border: 1px solid var(--hairline-strong);
+  border-radius: 9px;
+
+  background: var(--bg-midnight-lift);
+  color: var(--ink);
+
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.4;
+
+  outline: none;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--pulse-blue-primary);
+  background: var(--paper);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+.draft-preview {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.licence-sheet {
+  max-height: 660px;
+  overflow-y: auto;
+  border-radius: 14px;
+}
+
+.draft-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.draft-note {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+
 /* =========================================================
-   13. MODAL
+   12. MODAL
 ========================================================= */
 
 .modal {
@@ -2869,7 +2638,7 @@ svg {
 
 
 /* =========================================================
-   14. RESPONSIVE
+   13. RESPONSIVE
 ========================================================= */
 
 @media (max-width: 1180px) {
@@ -2944,26 +2713,18 @@ svg {
     padding-bottom: 0;
   }
 
-  .chat-split {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .chat-list-panel {
-    display: none;
-  }
-
   .topbar-search kbd {
     display: none;
+  }
+
+  .draft-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 720px) {
   .content {
     padding: 22px;
-  }
-
-  .view-flush {
-    margin: -22px;
   }
 
   .topbar {
@@ -3001,6 +2762,14 @@ svg {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .field-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .draft-panel {
+    padding: 22px 18px 24px;
+  }
+
   .new-deal {
     padding: 0 14px;
   }
@@ -3008,7 +2777,7 @@ svg {
 
 
 /* =========================================================
-   15. REDUCED MOTION
+   14. REDUCED MOTION
 ========================================================= */
 
 @media (prefers-reduced-motion: reduce) {

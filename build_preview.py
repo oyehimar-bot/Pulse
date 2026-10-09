@@ -12,10 +12,33 @@ Two bundles are produced:
   dashboard-preview.html  — the dashboard (with a demo session seeded,
                             since the real page guards on sign-in)
 """
+import base64
 import pathlib
 import re
 
 root = pathlib.Path(__file__).parent
+
+# The sandboxed preview server only serves the registered bundle HTML —
+# sibling image files 404 — so referenced local images are embedded as
+# data URIs in the preview copies. The deliverables are never modified.
+IMAGE_EXT = {"png": "image/png", "svg": "image/svg+xml",
+             "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}
+
+
+def inline_local_images(html: str) -> str:
+    def embed(match: re.Match) -> str:
+        filename = match.group(1)
+        path = root / filename
+        if not path.is_file():
+            return match.group(0)
+        mime = IMAGE_EXT.get(path.suffix.lower().lstrip("."))
+        if not mime:
+            return match.group(0)
+        b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+        return f'src="data:{mime};base64,{b64}"'
+
+    return re.sub(r'src="([^"/:]+\.(?:' + "|".join(IMAGE_EXT) + r'))"',
+                  embed, html)
 
 # ------------------------------------------------------------------
 # Preview-only scaler: a 1440x900 iframe scaled to fit the narrow pane.
@@ -82,6 +105,7 @@ def build(name: str, html_name: str, css_name: str, js_name: str,
         lambda _m: "<script>\n" + js + "\n</script>",
         html, count=1,
     )
+    html = inline_local_images(html)
 
     assert n_css == 1 and n_js == 1, (
         f"{name}: splice failed: css={n_css} js={n_js}"
