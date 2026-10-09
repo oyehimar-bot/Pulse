@@ -117,7 +117,8 @@ function closeModal() {
   demoModal.setAttribute("aria-hidden", "true");
 }
 
-demoButton.addEventListener("click", () => {
+demoButton.addEventListener("click", (event) => {
+  event.stopPropagation();
   setSignInOpen(true);
 });
 modalClose.addEventListener("click", closeModal);
