@@ -39,6 +39,17 @@ function cookieValue(config: AppConfig, token: string, expiresAt: Date) {
 export function buildApp(config: AppConfig, prisma = new PrismaClient()) {
   const app = Fastify({ logger: true });
 
+  app.removeContentTypeParser("application/json");
+  app.addContentTypeParser("application/json", { parseAs: "buffer" }, (request, body, done) => {
+    const rawBody = Buffer.isBuffer(body) ? body : Buffer.from(body);
+    request.rawBody = rawBody;
+    try {
+      done(null, JSON.parse(rawBody.toString("utf8")));
+    } catch (error) {
+      done(error as Error);
+    }
+  });
+
   app.addHook("onClose", async () => prisma.$disconnect());
 
   app.register(helmet);

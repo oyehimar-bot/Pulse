@@ -31,7 +31,7 @@ export async function transitionDeal(
   client: PrismaClient,
   options: TransitionOptions
 ) {
-  return client.$transaction(async (transaction) => {
+  return client.$transaction(async (transaction: Prisma.TransactionClient) => {
     const deal = await transaction.deal.findUnique({ where: { id: options.dealId } });
     if (!deal) throw new Error(`Deal ${options.dealId} was not found.`);
 

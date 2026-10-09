@@ -30,6 +30,31 @@ test("GET /health returns API liveness", async (context) => {
   assert.deepEqual(response.json(), { status: "ok", service: "pulse-api" });
 });
 
+test("JSON requests retain their exact raw body as a Buffer", async (context) => {
+  const app = buildApp(config);
+  app.post("/raw-body-test", async (request) => ({
+    rawBodyIsBuffer: Buffer.isBuffer(request.rawBody),
+    rawBody: request.rawBody.toString("utf8"),
+    body: request.body
+  }));
+  context.after(() => app.close());
+
+  const rawBody = '{"value": 1} ';
+  const response = await app.inject({
+    method: "POST",
+    url: "/raw-body-test",
+    headers: { "content-type": "application/json" },
+    payload: rawBody
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    rawBodyIsBuffer: true,
+    rawBody,
+    body: { value: 1 }
+  });
+});
+
 test("WhatsApp proof creates a verified cookie session and enforces expiry and limits", {
   skip: !process.env.TEST_DATABASE_URL
 }, async () => {
