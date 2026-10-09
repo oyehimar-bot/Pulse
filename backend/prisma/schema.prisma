@@ -65,13 +65,45 @@ model Session {
   id        String   @id @default(cuid())
   tokenHash String   @unique @map("token_hash")
   userId    String   @map("user_id")
+  challengeId String? @unique @map("challenge_id")
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge AuthChallenge? @relation(fields: [challengeId], references: [id], onDelete: SetNull)
 
   @@index([userId, expiresAt])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+model AuthChallenge {
+  id             String   @id
+  phone          String
+  displayName    String?  @map("display_name")
+  codeHash       String   @map("code_hash")
+  requesterHash  String   @map("requester_hash")
+  attempts       Int      @default(0)
+  expiresAt      DateTime @map("expires_at")
+  verifiedAt     DateTime? @map("verified_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  session        Session?
+
+  @@index([phone, expiresAt, verifiedAt])
+  @@index([requesterHash, createdAt])
+  @@map("auth_challenges")
+}
+
+model AuthRateLimitBucket {
+  id         String   @id @default(cuid())
+  scope      String
+  keyHash    String   @map("key_hash")
+  bucketStart DateTime @map("bucket_start")
+  count      Int      @default(0)
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([scope, keyHash, bucketStart])
+  @@index([bucketStart])
+  @@map("auth_rate_limit_buckets")
 }
 
 model Deal {

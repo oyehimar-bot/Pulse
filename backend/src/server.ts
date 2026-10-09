@@ -1,5 +1,6 @@
 import { config as loadDotEnv } from "dotenv";
 import { resolve } from "node:path";
+import { PrismaClient } from "@prisma/client";
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 
@@ -7,7 +8,8 @@ loadDotEnv({ path: resolve(process.cwd(), "../.env") });
 
 async function start() {
   const config = loadConfig();
-  const app = buildApp(config);
+  const prisma = new PrismaClient();
+  const app = buildApp(config, prisma);
 
   try {
     await app.listen({ host: "0.0.0.0", port: config.PORT });

@@ -18,6 +18,35 @@ main {
   padding: 32px;
 }
 
+section {
+  max-width: 480px;
+  margin-top: 32px;
+}
+
+form {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+}
+
+input,
+button {
+  box-sizing: border-box;
+  min-height: 42px;
+  padding: 8px 10px;
+  font: inherit;
+}
+
+button,
+a {
+  width: fit-content;
+}
+
 output {
   display: block;
   margin-top: 24px;
