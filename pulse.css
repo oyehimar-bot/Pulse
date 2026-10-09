@@ -24,7 +24,7 @@
   --bg-midnight-lift: #F5F3EE;
   --bg-midnight-lift-deep: #E7E5DF;
   --surface-card: rgba(250, 249, 245, 0.76);
-  --text-white: #f2f3f5;
+  --text-white: #121720cc;
   --text-muted: #526078;
 
   /* Derived, palette-only effects (alpha layers of the tokens above) */
@@ -2524,7 +2524,7 @@ body {
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
-  color: var(--text-white);
+  color: #FFFFFF;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
