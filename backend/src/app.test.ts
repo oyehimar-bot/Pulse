@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomInt } from "node:crypto";
+import { createHmac, randomInt } from "node:crypto";
 import test from "node:test";
 import { PrismaClient } from "@prisma/client";
 import { buildApp } from "./app.js";
@@ -22,7 +22,7 @@ const config = loadConfig({
 });
 
 test("GET /health returns API liveness", async (context) => {
-  const app = buildApp(config);
+  const app = await buildApp(config);
   context.after(() => app.close());
 
   const response = await app.inject({ method: "GET", url: "/health" });
@@ -30,29 +30,24 @@ test("GET /health returns API liveness", async (context) => {
   assert.deepEqual(response.json(), { status: "ok", service: "pulse-api" });
 });
 
-test("JSON requests retain their exact raw body as a Buffer", async (context) => {
-  const app = buildApp(config);
-  app.post("/raw-body-test", async (request) => ({
-    rawBodyIsBuffer: Buffer.isBuffer(request.rawBody),
-    rawBody: request.rawBody.toString("utf8"),
-    body: request.body
-  }));
+test("the raw-body plugin retains exact webhook JSON text", async (context) => {
+  const app = await buildApp(config);
   context.after(() => app.close());
 
-  const rawBody = '{"value": 1} ';
+  const rawBody = '{"object":"not-whatsapp","entry":[]} ';
+  const signature = `sha256=${createHmac("sha256", config.WHATSAPP_APP_SECRET).update(rawBody).digest("hex")}`;
   const response = await app.inject({
     method: "POST",
-    url: "/raw-body-test",
-    headers: { "content-type": "application/json" },
+    url: "/webhooks/whatsapp",
+    headers: {
+      "content-type": "application/json",
+      "x-hub-signature-256": signature
+    },
     payload: rawBody
   });
 
-  assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.json(), {
-    rawBodyIsBuffer: true,
-    rawBody,
-    body: { value: 1 }
-  });
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(response.json(), { error: "Invalid WhatsApp webhook payload." });
 });
 
 test("WhatsApp proof creates a verified cookie session and enforces expiry and limits", {
@@ -61,7 +56,7 @@ test("WhatsApp proof creates a verified cookie session and enforces expiry and l
   const databaseUrl = process.env.TEST_DATABASE_URL;
   assert(databaseUrl);
   const prisma = new PrismaClient({ datasourceUrl: databaseUrl });
-  const app = buildApp({ ...config, DATABASE_URL: databaseUrl }, prisma);
+  const app = await buildApp({ ...config, DATABASE_URL: databaseUrl }, prisma);
   const phone = `+234${randomInt(1_000_000_000, 2_000_000_000)}`;
   const requestChallenge = (targetPhone = phone, remoteAddress = "198.51.100.44") => app.inject({
     method: "POST",

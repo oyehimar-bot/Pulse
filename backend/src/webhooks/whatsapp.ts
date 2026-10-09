@@ -46,7 +46,7 @@ type MetaPayload = {
 
 type QueueItem = { externalId: string; kind: "message" | "status"; value: MetaMessage | MetaStatus };
 
-export function isValidMetaSignature(rawBody: Buffer, header: string | undefined, appSecret: string): boolean {
+export function isValidMetaSignature(rawBody: string | Buffer, header: string | undefined, appSecret: string): boolean {
   if (!header || !/^sha256=[a-f0-9]{64}$/i.test(header)) return false;
   const supplied = Buffer.from(header.slice("sha256=".length), "hex");
   const expected = createHmac("sha256", appSecret).update(rawBody).digest();
@@ -201,10 +201,10 @@ export function registerWhatsAppWebhook(app: FastifyInstance, prisma: PrismaClie
     return reply.type("text/plain").send(challenge);
   });
 
-  app.post("/webhooks/whatsapp", async (request, reply) => {
+  app.post("/webhooks/whatsapp", { config: { rawBody: true } }, async (request, reply) => {
     const rawBody = request.rawBody;
     const signature = request.headers["x-hub-signature-256"];
-    if (!Buffer.isBuffer(rawBody) || !isValidMetaSignature(rawBody, typeof signature === "string" ? signature : undefined, config.WHATSAPP_APP_SECRET)) {
+    if (typeof rawBody !== "string" || !isValidMetaSignature(rawBody, typeof signature === "string" ? signature : undefined, config.WHATSAPP_APP_SECRET)) {
       request.log.warn({ requestId: request.id }, "Rejected WhatsApp webhook with invalid signature");
       return reply.code(401).send({ error: "Invalid webhook signature." });
     }
