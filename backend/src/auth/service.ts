@@ -55,7 +55,7 @@ export async function createAuthChallenge(
   const phoneKey = digest(config.SESSION_SECRET, "rate-phone", input.phone);
   const ipKey = digest(config.SESSION_SECRET, "rate-ip", input.requesterIp);
 
-  const [phoneCount, ipCount] = await prisma.$transaction(async (transaction) => {
+  const [phoneCount, ipCount] = await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
     const phoneAttempts = await incrementBucket(transaction, "phone", phoneKey, windowStart);
     const ipAttempts = await incrementBucket(transaction, "ip", ipKey, windowStart);
     return [phoneAttempts, ipAttempts] as const;
@@ -131,7 +131,7 @@ export async function consumeWhatsAppProof(
     return false;
   }
 
-  return prisma.$transaction(async (transaction) => {
+  return prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
     const claimed = await transaction.authChallenge.updateMany({
       where: { id: challenge.id, verifiedAt: null, expiresAt: { gt: now } },
       data: { verifiedAt: now }
@@ -173,7 +173,7 @@ export async function issueChallengeSession(prisma: PrismaClient, challengeId: s
 
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(now.getTime() + sessionLifetimeMs);
-  const session = await prisma.$transaction(async (transaction) => {
+  const session = await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
     const currentChallenge = await transaction.authChallenge.findUnique({ where: { id: challengeId } });
     if (!currentChallenge?.verifiedAt) return null;
     const user = await transaction.user.findUnique({ where: { phone: currentChallenge.phone } });
