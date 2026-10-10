@@ -21,6 +21,7 @@ import {
   setSellerDraft
 } from "../deals/drafting.js";
 import { transitionDeal } from "../deals/transitions.js";
+import { getOrCreatePayazaPaymentLink } from "../payaza.js";
 import { WhatsAppSender } from "../whatsapp/sender.js";
 
 const graphApiBase = "https://graph.facebook.com";
@@ -167,6 +168,12 @@ async function processMessage(
             buyerVerifiedOnPulse: buyerUser?.isPhoneVerified ?? false,
           }
         });
+
+        let paymentLink: { id: number; url: string } | undefined;
+        if (nextStatus === "AWAITING_PAYMENT") {
+          paymentLink = await getOrCreatePayazaPaymentLink(prisma, config, pendingDeal);
+        }
+
         await transitionDeal(prisma, {
           dealId: pendingDeal.id,
           to: nextStatus,
@@ -175,9 +182,12 @@ async function processMessage(
         });
         clearBuyerDecisionContext(phone);
         const sellerMessage = nextStatus === "AWAITING_PAYMENT"
-          ? `${pendingDeal.seller.displayName ?? "Your seller"} saw the deal accepted and it is moving to payment.`
+          ? `The buyer accepted deal ${pendingDeal.dealCode}. Payment is now awaiting completion.`
           : `${pendingDeal.seller.displayName ?? "Your seller"} saw the deal declined and it is now closed.`;
         await sender.sendText(pendingDeal.seller.phone, sellerMessage);
+        if (paymentLink) {
+          await sender.sendText(phone, `Deal accepted. Pay ${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(Number(pendingDeal.amountKobo) / 100)} securely through Payaza:\n${paymentLink.url}`, pendingDeal.id);
+        }
       }
     }
   } else if (/^DEAL-[A-Z0-9]{6,8}$/i.test(body)) {

@@ -4,6 +4,7 @@ import test from "node:test";
 import { PrismaClient } from "@prisma/client";
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
+import { createPayazaPaymentLink, isValidPayazaSignature } from "./payaza.js";
 
 const config = loadConfig({
   DATABASE_URL: "postgresql://pulse:pulse@localhost:5432/pulse",
@@ -30,6 +31,40 @@ test("GET /health returns API liveness", async (context) => {
   assert.deepEqual(response.json(), { status: "ok", service: "pulse-api" });
 });
 
+test("Payaza HMAC verification matches the documented raw-body contract", () => {
+  const rawBody = '{"transaction_reference":"PTSA123","transaction_status":"NIP_SUCCESS","amount_received":2500}';
+  const signature = createHmac("sha512", config.PAYAZA_SECRET_KEY_TEST).update(rawBody, "utf8").digest("base64");
+
+  assert.equal(isValidPayazaSignature(rawBody, signature, config.PAYAZA_SECRET_KEY_TEST), true);
+  assert.equal(isValidPayazaSignature(rawBody, "bad-signature", config.PAYAZA_SECRET_KEY_TEST), false);
+  assert.equal(isValidPayazaSignature(rawBody, `${signature}trailing`, config.PAYAZA_SECRET_KEY_TEST), false);
+});
+
+test("Payaza payment links use the documented fixed-amount API contract", async () => {
+  let requestedUrl = "";
+  let requestedAuthorization = "";
+  let requestedBody: Record<string, unknown> = {};
+  const link = await createPayazaPaymentLink(config, {
+    dealCode: "ABC12345",
+    description: "Digital audio license",
+    amountKobo: 125050n
+  }, async (input, init) => {
+    requestedUrl = String(input);
+    requestedAuthorization = new Headers(init?.headers).get("Authorization") ?? "";
+    requestedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return new Response(JSON.stringify({ status: true, data: { id: 84021, link: "https://business.payaza.africa/pay/pulsedealabc12345" } }), { status: 200 });
+  });
+
+  assert.equal(requestedUrl, "https://api.payaza.africa/live/payment-link/merchant/create-payment-link");
+  assert.equal(requestedAuthorization, `Payaza ${Buffer.from(config.PAYAZA_PUBLIC_KEY_TEST).toString("base64")}`);
+  assert.equal(requestedBody.payment_link_name, "PulseDealABC12345");
+  assert.equal(requestedBody.payment_amount, 1250.5);
+  assert.equal(requestedBody.has_fixed_amount, true);
+  assert.equal(requestedBody.currency_code, "NGN");
+  assert.equal(requestedBody.fee_bearer_type, "Business");
+  assert.deepEqual(link, { id: 84021, url: "https://business.payaza.africa/pay/pulsedealabc12345" });
+});
+
 test("the raw-body plugin retains exact webhook JSON text", async (context) => {
   const app = await buildApp(config);
   context.after(() => app.close());
@@ -48,6 +83,40 @@ test("the raw-body plugin retains exact webhook JSON text", async (context) => {
 
   assert.equal(response.statusCode, 400);
   assert.deepEqual(response.json(), { error: "Invalid WhatsApp webhook payload." });
+});
+
+test("Payaza webhook verifies the exact raw body and queues by transaction reference and status", async (context) => {
+  const queued: Array<{ externalId: string }> = [];
+  const prisma = {
+    $disconnect: async () => {},
+    webhookEvent: {
+      createMany: async ({ data }: { data: Array<{ externalId: string }> }) => { queued.push(...data); },
+      findMany: async () => [],
+      update: async () => {}
+    }
+  } as unknown as PrismaClient;
+  const app = await buildApp(config, prisma);
+  context.after(() => app.close());
+
+  const rawBody = '{"transaction_reference":"P-C-20261010-ABC123","transaction_status":"Funds Received"} ';
+  const signature = createHmac("sha512", config.PAYAZA_SECRET_KEY_TEST).update(rawBody, "utf8").digest("base64");
+  const rejected = await app.inject({
+    method: "POST",
+    url: "/webhooks/payaza",
+    headers: { "content-type": "application/json", "x-payaza-signature": `${signature}invalid` },
+    payload: rawBody
+  });
+  assert.equal(rejected.statusCode, 401);
+  assert.equal(queued.length, 0);
+
+  const accepted = await app.inject({
+    method: "POST",
+    url: "/webhooks/payaza",
+    headers: { "content-type": "application/json", "x-payaza-signature": signature },
+    payload: rawBody
+  });
+  assert.equal(accepted.statusCode, 200);
+  assert.deepEqual(queued.map((item) => item.externalId), ["payaza:P-C-20261010-ABC123:funds received"]);
 });
 
 test("WhatsApp proof creates a verified cookie session and enforces expiry and limits", {

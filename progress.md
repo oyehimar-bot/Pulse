@@ -4,7 +4,7 @@ Updated: 2026-10-09
 
 ## Current checkpoint
 
-Phase 0, Phase 1, and the Phase 2 auth implementation are complete and locally verified. Phases 3 through 10 have not started. No Meta WhatsApp or Payaza integration has been attempted, and no external calls are mocked.
+Phases 0 through 6 are implemented and verified locally. Phase 6 uses Payaza's test payment-link API and signed webhook contract; live payments are not enabled. WhatsApp and Payaza API calls are real integrations, not mocked in the application.
 
 ## Built so far
 
@@ -37,6 +37,14 @@ Phase 0, Phase 1, and the Phase 2 auth implementation are complete and locally v
 - Added the signup/login wireframe flow with WhatsApp link, displayed code, polling, expiry/lockout feedback, account state, and logout.
 - Exported the proof consumer for Phase 3's signature-verified Meta webhook. No fake incoming-message route was added.
 
+### Phase 6: Payaza test payments
+
+- Create and persist a fixed-amount Payaza payment link after buyer acceptance, then deliver the hosted checkout URL to the buyer over WhatsApp.
+- Verify Payaza webhook HMAC-SHA512 signatures against the exact raw request body and deduplicate by transaction reference and status.
+- Reconcile signed transaction references through Payaza's documented payment-link transaction lookup rather than assuming an undocumented deal-reference field.
+- Verify the completed transaction amount, then atomically mark the payment successful, transition the deal to `FUNDED`, record the escrow ledger credit, and complete the webhook event.
+- Notify both buyer and seller after escrow funding. Persist each payment link ID for transaction reconciliation.
+
 ## Verification so far
 
 - Prisma client generation and schema validation passed with matching Prisma CLI/client 6.19.0.
@@ -52,6 +60,8 @@ Phase 0, Phase 1, and the Phase 2 auth implementation are complete and locally v
 - Phase 2 migration deployed successfully to a fresh disposable PostgreSQL 18 database.
 - Database-backed auth tests passed for new signup, existing-account login, wrong sender/code, one-time code consumption, cookie session, logout, expiry, phone/IP throttling, and five-attempt lockout.
 - Phase 2 typecheck, ESLint, production builds, schema validation, and all backend tests passed.
+- Phase 6 Payaza tests pass for the documented payment-link request, exact raw-body HMAC validation, webhook rejection/acceptance, transaction reconciliation, atomic escrow funding, and buyer/seller notices.
+- Phase 6 full backend suite, workspace build, and lint pass. The database-backed auth integration test is skipped unless `TEST_DATABASE_URL` is configured.
 
 ## Open Phase 0/1 work
 
@@ -63,10 +73,6 @@ Phase 0, Phase 1, and the Phase 2 auth implementation are complete and locally v
 
 ## Remaining phases
 
-- **Phase 3: WhatsApp channel.** Meta verification and signature checking, webhook deduplication and quick acknowledgement, background processing, message send types, inbound routing, and surfaced delivery failures.
-- **Phase 4: Deal drafting.** Structured Anthropic parsing when configured, exact-format fallback, editable draft confirmation, and optional buyer verification phrase.
-- **Phase 5: Buyer entry.** Confirmed deal creation, unique deal code and `wa.me` link, buyer-initiated join, and deal acceptance or decline.
-- **Phase 6: Payaza test payments.** Implement only documented Payaza payment-link and webhook contracts, verify signatures, deduplicate events, ledger escrow funding, and notify both parties.
 - **Phase 7: Delivery and release.** Delivery updates, buyer release or issue action, fee and payout ledger entries, documented Payaza transfer flow, pending payout visibility, and deal expiry timers.
 - **Phase 8: License certificate.** PDF creation, canonical-data SHA-256, QR verification URL, file storage, WhatsApp document delivery, and public verification.
 - **Phase 9: React wireframe.** Auth, dashboard, deal details with timeline/ledger/messages, license list, and public verification page, using typed REST responses.
@@ -83,4 +89,5 @@ Phase 0, Phase 1, and the Phase 2 auth implementation are complete and locally v
 - The API is intended to run on port 3000 and Vite on port 5173 by default.
 - Prisma CLI and client are set to 6.19.0 and lockfile installation/generation has been verified. The attempted switch to audit-suggested 6.12.0 could not install because the npm registry was unreachable. Recheck the development dependency audit when registry access is available.
 - A workspace sorter moved the pre-existing prototype files from the repository root into `save/`. Those files remain present there. This build did not intentionally edit or delete the prototypes; their relocation appears in Git as deletions at the old paths and an untracked `save/` directory.
-- There is no connected Meta webhook, outbound WhatsApp message, payment flow, deal conversation, or license issuance yet. Auth challenge/session plumbing is implemented, but the actual WhatsApp proof round trip awaits Phase 3.
+- Payaza test credentials are configured locally. Apply the Phase 6 migration with `npm run db:migrate` before running the payment flow against a persistent database.
+- Payaza must be configured to send collection webhooks to `/webhooks/payaza` on the public HTTPS API origin. Live payments remain out of scope for Phase 6.

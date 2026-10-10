@@ -13,7 +13,9 @@ import {
   issueChallengeSession
 } from "./auth/service.js";
 import type { AppConfig } from "./config.js";
+import { registerPayazaWebhook } from "./payaza.js";
 import { registerWhatsAppWebhook } from "./webhooks/whatsapp.js";
+import { WhatsAppSender } from "./whatsapp/sender.js";
 
 const phoneSchema = z.string().regex(/^\+[1-9]\d{7,14}$/, "Enter a phone number in international format, for example +2348012345678.");
 const challengeSchema = z.object({
@@ -107,7 +109,9 @@ export async function buildApp(config: AppConfig, prisma = new PrismaClient()) {
     return reply.header("Set-Cookie", `${sessionCookieName}=; ${cookieAttributes(config)}; Max-Age=0`).code(204).send();
   });
 
+  const whatsappSender = new WhatsAppSender(prisma, config);
   registerWhatsAppWebhook(app, prisma, config);
+  registerPayazaWebhook(app, prisma, config, whatsappSender);
 
   return app;
 }

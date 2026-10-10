@@ -30,10 +30,8 @@ After each phase is implemented and tested, commit the phase locally with a clea
 
 ## Webhook tunnel
 
-Meta must reach the local API over HTTPS. Start a tunnel such as Cloudflare Tunnel or ngrok and set `PUBLIC_BASE_URL` to its HTTPS origin. Register the WhatsApp webhook callback URL as `https://<your-tunnel-host>/webhooks/whatsapp` and use the configured `WHATSAPP_VERIFY_TOKEN` for verification. The webhook route is added in Phase 3; until then, the URL is not yet served.
+Meta and Payaza must reach the local API over HTTPS. Start a tunnel such as Cloudflare Tunnel or ngrok and set `PUBLIC_BASE_URL` to its HTTPS origin. Register the WhatsApp callback URL as `https://<your-tunnel-host>/webhooks/whatsapp` and use the configured `WHATSAPP_VERIFY_TOKEN` for verification. Configure Payaza's test collection webhook URL as `https://<your-tunnel-host>/webhooks/payaza`; the backend validates `x-payaza-signature` with `PAYAZA_SECRET_KEY_TEST`.
 
 ## Current scope
 
-Phase 0 provides the service and client scaffold. Phase 1 adds the PostgreSQL schema and seed data. Phase 2 adds `POST /auth/challenges`, `GET /auth/challenges/:challengeId`, `GET /auth/me`, and `POST /auth/logout`. Challenge creation returns a six-digit code for the user to send to Pulse, and status polling establishes an HTTP-only cookie session after the WhatsApp proof is accepted.
-
-The proof consumer is implemented in the backend for the Phase 3 Meta webhook to call after signature verification. Until Phase 3 is built and configured with Meta test credentials, the WhatsApp code round trip is not connected. There are no mock webhook endpoints or fake WhatsApp messages.
+Phases 0 through 5 provide the service scaffold, database and auth, WhatsApp conversation flow, deal drafting, and buyer entry. Phase 6 creates a fixed-amount Payaza payment link when a buyer accepts; signed collection events are reconciled against Payaza's payment-link transaction API before escrow is marked funded. The deal, payment, audit event, ledger credit, and webhook completion are committed atomically. Configure the test credentials and apply migrations before exercising this flow against a database.

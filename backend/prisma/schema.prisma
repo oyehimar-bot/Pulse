@@ -175,6 +175,7 @@ model Payment {
   id               String        @id @default(cuid())
   dealId           String        @map("deal_id")
   providerReference String        @unique @map("provider_reference")
+  payazaLinkId     Int?          @unique @map("payaza_link_id")
   status           PaymentStatus @default(PENDING)
   amountKobo       BigInt        @map("amount_kobo")
   rawPayload       Json?         @map("raw_payload")
