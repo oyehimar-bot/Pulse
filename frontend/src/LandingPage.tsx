@@ -1,21 +1,33 @@
 import { useState, useEffect, useRef } from "react";
+import type { FormEvent } from "react";
+import { postJson, apiRequest } from "./api";
+import type { PulseUser } from "./api";
+
+type AuthChallenge = { challengeId: string; code: string; expiresAt: string; whatsappLink: string };
+type AuthStatus = { status: "PENDING" | "EXPIRED" | "LOCKED" | "VERIFIED"; user?: PulseUser };
 
 export default function LandingPage({ onEnterDashboard }: { onEnterDashboard: () => void }) {
-  // State for sign-in panel, mobile nav, auth mode, typing animation
   const [signinOpen, setSigninOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
   const [activeNav, setActiveNav] = useState("home");
   const [typingText, setTypingText] = useState("How can I help you today?");
   const sceneRef = useRef<HTMLDivElement>(null);
   const [sceneHover, setSceneHover] = useState(false);
 
-  // Typing animation cycling through messages
+  // Auth state
+  const [challenge, setChallenge] = useState<AuthChallenge | null>(null);
+  const [status, setStatus] = useState<AuthStatus["status"] | null>(null);
+  const [phone, setPhone] = useState("");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Typing animation
   useEffect(() => {
     const messages = [
       "How can I help you today?",
-      "Draft a deal for exclusive beat rights…",
-      "₦200,000 locked — escrow confirmed.",
+      "Draft a deal for exclusive beat rights\u2026",
+      "\u20a6200,000 locked \u2014 escrow confirmed.",
       "Proof-of-License issued. All done."
     ];
     let i = 0;
@@ -26,10 +38,10 @@ export default function LandingPage({ onEnterDashboard }: { onEnterDashboard: ()
     return () => clearInterval(timer);
   }, []);
 
-  // Close sign-in on Escape
+  // Close panel on Escape
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setSigninOpen(false);
+      if (e.key === "Escape") { setSigninOpen(false); setChallenge(null); setStatus(null); }
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -39,17 +51,14 @@ export default function LandingPage({ onEnterDashboard }: { onEnterDashboard: ()
   useEffect(() => {
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReducedMotion || !sceneRef.current) return;
-
     let targetX = 0, targetY = 0, currentX = 0, currentY = 0;
     let animFrame: number;
-
     function onMove(e: MouseEvent) {
       const w = window.innerWidth;
       const h = window.innerHeight;
       targetX = ((e.clientX / w) - 0.5) * 12;
       targetY = ((e.clientY / h) - 0.5) * 8;
     }
-
     function animate() {
       currentX += (targetX - currentX) * 0.055;
       currentY += (targetY - currentY) * 0.055;
@@ -58,18 +67,55 @@ export default function LandingPage({ onEnterDashboard }: { onEnterDashboard: ()
       }
       animFrame = requestAnimationFrame(animate);
     }
-
     window.addEventListener("mousemove", onMove);
     animFrame = requestAnimationFrame(animate);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      cancelAnimationFrame(animFrame);
-    };
+    return () => { window.removeEventListener("mousemove", onMove); cancelAnimationFrame(animFrame); };
   }, []);
 
-  function handleSignIn(e: React.FormEvent) {
+  // Poll for WhatsApp verification
+  useEffect(() => {
+    if (!challenge || status === "VERIFIED" || status === "EXPIRED" || status === "LOCKED") return;
+    let cancelled = false;
+    let timer: number | undefined;
+    const poll = async () => {
+      try {
+        const result = await apiRequest<AuthStatus>(`/auth/challenges/${challenge.challengeId}`);
+        if (cancelled) return;
+        setStatus(result.status);
+        if (result.status === "VERIFIED" && result.user) {
+          setSigninOpen(false);
+          onEnterDashboard();
+        } else if (result.status === "PENDING") {
+          timer = window.setTimeout(poll, 2000);
+        }
+      } catch { if (!cancelled) timer = window.setTimeout(poll, 4000); }
+    };
+    void poll();
+    return () => { cancelled = true; if (timer) window.clearTimeout(timer); };
+  }, [challenge, status, onEnterDashboard]);
+
+  async function startAuth(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    onEnterDashboard();
+    setBusy(true);
+    setAuthError(null);
+    try {
+      const result = await postJson<AuthChallenge>("/auth/challenges", {
+        phone,
+        ...(name.trim() ? { displayName: name.trim() } : {})
+      });
+      setChallenge(result);
+      setStatus("PENDING");
+    } catch (reason) {
+      setAuthError(reason instanceof Error ? reason.message : "Could not start verification.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function resetAuth() {
+    setChallenge(null);
+    setStatus(null);
+    setAuthError(null);
   }
 
   return (
@@ -104,45 +150,83 @@ export default function LandingPage({ onEnterDashboard }: { onEnterDashboard: ()
 
         <button
           className="signin-button"
-          onClick={() => setSigninOpen(!signinOpen)}
+          onClick={() => { setSigninOpen(!signinOpen); resetAuth(); }}
           aria-expanded={signinOpen}
         >
           Sign In
         </button>
 
-        {/* Sign-in panel */}
-        <div className={`signin-panel${signinOpen ? " open" : ""}`}>
+        {/* Auth panel — WhatsApp phone number only, no email/password */}
+        <div className={`signin-panel${signinOpen ? " open" : ""}`} role="dialog" aria-label="Sign in to Pulse">
           <div className="signin-panel-heading">
             <span className="section-kicker">Pulse workspace</span>
-            <h2>{isSignUp ? "Create your account." : "Welcome back."}</h2>
+            <h2>{challenge ? "Verify your number" : "Sign in or create account"}</h2>
+            {!challenge && <p className="signin-sub">Your verified WhatsApp number is your account.</p>}
           </div>
 
-          {!isSignUp ? (
-            <form className="signin-form" onSubmit={handleSignIn}>
-              <label htmlFor="signinEmail">Email address</label>
-              <input id="signinEmail" type="email" autoComplete="email" placeholder="you@example.com" required />
-              <label htmlFor="signinPassword">Password</label>
-              <input id="signinPassword" type="password" autoComplete="current-password" placeholder="Enter your password" required />
-              <button type="submit">Continue to Pulse</button>
-            </form>
+          {challenge ? (
+            <>
+              <p className="auth-help">Send this code to Pulse on WhatsApp to confirm your number.</p>
+              <output className="auth-code-display">{challenge.code}</output>
+              <a className="signin-whatsapp-btn" href={challenge.whatsappLink} target="_blank" rel="noreferrer">
+                Open WhatsApp
+              </a>
+              <p className="auth-wait-note">
+                <i className="lock-dot" />
+                {status === "EXPIRED"
+                  ? "This code expired. Start again for a new one."
+                  : status === "LOCKED"
+                  ? "Too many attempts. Try again later."
+                  : "Waiting for WhatsApp verification..."}
+              </p>
+              {(status === "EXPIRED" || status === "LOCKED") && (
+                <button className="link-btn" type="button" onClick={resetAuth}>Start again</button>
+              )}
+            </>
           ) : (
-            <form className="signin-form signup-form" onSubmit={handleSignIn}>
-              <label htmlFor="signupName">Your name</label>
-              <input id="signupName" type="text" autoComplete="name" placeholder="Your name" required />
-              <label htmlFor="signupEmail">Email address</label>
-              <input id="signupEmail" type="email" autoComplete="email" placeholder="you@example.com" required />
-              <label htmlFor="signupPassword">Create a password</label>
-              <input id="signupPassword" type="password" autoComplete="new-password" placeholder="At least 8 characters" minLength={8} required />
-              <label htmlFor="signupConfirm">Confirm password</label>
-              <input id="signupConfirm" type="password" autoComplete="new-password" placeholder="Repeat your password" minLength={8} required />
-              <button type="submit">Create Pulse account</button>
+            <form className="signin-form" onSubmit={(e) => void startAuth(e)}>
+              <label htmlFor="signinPhone">Phone number</label>
+              <input
+                id="signinPhone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="+234 801 234 5678"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+              <label htmlFor="signinName">
+                Your name <small>Optional for existing accounts</small>
+              </label>
+              <input
+                id="signinName"
+                type="text"
+                autoComplete="name"
+                placeholder="Display name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <button type="submit" disabled={busy}>
+                {busy ? "Starting verification..." : "Continue with WhatsApp"}
+              </button>
             </form>
           )}
 
-          <button className="auth-switch" type="button" onClick={() => setIsSignUp(!isSignUp)}>
-            {isSignUp ? "Already have an account? Sign in" : "New to Pulse? Sign up"}
-          </button>
+          {authError && <p className="auth-error" role="alert">{authError}</p>}
+          <p className="signin-privacy">
+            <span>Secure sign-in. Your phone number is never shown to other users.</span>
+          </p>
         </div>
+
+        {/* Backdrop to close panel */}
+        {signinOpen && (
+          <div
+            className="signin-backdrop"
+            onClick={() => { setSigninOpen(false); resetAuth(); }}
+            aria-hidden="true"
+          />
+        )}
       </header>
 
       {/* HERO */}
@@ -156,7 +240,7 @@ export default function LandingPage({ onEnterDashboard }: { onEnterDashboard: ()
             Pulse keeps the creative brief, beat rights, and payment in one
             clear conversation, from first idea to final delivery.
           </p>
-          <button className="demo-button" onClick={() => setSigninOpen(true)}>
+          <button className="demo-button" onClick={() => { setSigninOpen(true); resetAuth(); }}>
             <span>Get Started</span>
             <span className="demo-arrow">
               <svg viewBox="0 0 34 10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
@@ -184,8 +268,8 @@ export default function LandingPage({ onEnterDashboard }: { onEnterDashboard: ()
               </div>
               <div className="deal-summary">
                 <span className="summary-kicker">Exclusive beat license</span>
-                <strong>₦200,000</strong>
-                <span>₦100,000 deposit · ₦100,000 on final stems</span>
+                <strong>&#8358;200,000</strong>
+                <span>&#8358;100,000 deposit &middot; &#8358;100,000 on final stems</span>
                 <div className="deal-actions">
                   <span>Approve &amp; Generate Link</span>
                   <span>Edit Deal</span>
@@ -197,31 +281,15 @@ export default function LandingPage({ onEnterDashboard }: { onEnterDashboard: ()
             </div>
 
             <div className="human-person person-left" aria-hidden="true">
-              <div className="person-label">Joe · Producer <span>09:41</span></div>
-              <img
-                className={`character-image${sceneHover ? "" : " active"}`}
-                src="/producer.png"
-                alt=""
-              />
-              <img
-                className={`character-image${sceneHover ? " active" : ""}`}
-                src="/producer-touch.png"
-                alt=""
-              />
+              <div className="person-label">Joe &middot; Producer <span>09:41</span></div>
+              <img className={`character-image${sceneHover ? "" : " active"}`} src="/producer.png" alt="" />
+              <img className={`character-image${sceneHover ? " active" : ""}`} src="/producer-touch.png" alt="" />
             </div>
 
             <div className="human-person person-right" aria-hidden="true">
-              <div className="person-label">Tunde · Artist <span>09:42</span></div>
-              <img
-                className={`character-image${sceneHover ? "" : " active"}`}
-                src="/buyer.png"
-                alt=""
-              />
-              <img
-                className={`character-image${sceneHover ? " active" : ""}`}
-                src="/buyer-touch.png"
-                alt=""
-              />
+              <div className="person-label">Tunde &middot; Artist <span>09:42</span></div>
+              <img className={`character-image${sceneHover ? "" : " active"}`} src="/buyer.png" alt="" />
+              <img className={`character-image${sceneHover ? " active" : ""}`} src="/buyer-touch.png" alt="" />
             </div>
 
             <div className={`pulse-beam${sceneHover ? " visible" : ""}`} aria-hidden="true">
@@ -229,18 +297,18 @@ export default function LandingPage({ onEnterDashboard }: { onEnterDashboard: ()
             </div>
 
             <div className="message-bubble bubble-left producer-message">
-              <small>Producer · Creator</small>
-              <span>Draft exclusive beat rights for @tunde at ₦200,000. 50% now, 50% on final stems.</span>
+              <small>Producer &middot; Creator</small>
+              <span>Draft exclusive beat rights for @tunde at &#8358;200,000. 50% now, 50% on final stems.</span>
             </div>
             <div className="message-bubble bubble-right buyer-message">
-              <small>Tunde · Buyer</small>
-              <span>Making the 50% deposit of ₦100,000 now.</span>
+              <small>Tunde &middot; Buyer</small>
+              <span>Making the 50% deposit of &#8358;100,000 now.</span>
             </div>
             <div className="message-bubble bot-message">
               <small>Pulse Bot</small>
-              <span>Payment received. Proof-of-License issued. Final ₦100,000 releases when stems arrive.</span>
+              <span>Payment received. Proof-of-License issued. Final &#8358;100,000 releases when stems arrive.</span>
             </div>
-            <div className="conversation-note"><span /> Escrow locked · stems next</div>
+            <div className="conversation-note"><span /> Escrow locked &middot; stems next</div>
           </div>
         </div>
       </section>
@@ -271,7 +339,7 @@ export default function LandingPage({ onEnterDashboard }: { onEnterDashboard: ()
         </div>
         <div className="section-detail contact-detail">
           <p>Have a beat, a brief, or a question about a deal? Reach the Pulse team at <a href="mailto:hello@pulse.example">hello@pulse.example</a>.</p>
-          <a className="contact-action" href="mailto:hello@pulse.example">Open a conversation <span>↗</span></a>
+          <a className="contact-action" href="mailto:hello@pulse.example">Open a conversation <span>&#8599;</span></a>
           <span className="contact-status"><i /> Usually replies within one working day</span>
         </div>
       </section>
@@ -298,7 +366,7 @@ export default function LandingPage({ onEnterDashboard }: { onEnterDashboard: ()
         </a>
       </div>
 
-      {/* DEMO MODAL (typing text) */}
+      {/* TYPING INDICATOR */}
       <div className="modal-typing" aria-hidden="true">
         <div className="modal-demo-label">Pulse Assistant</div>
         <div className="typing">{typingText}</div>

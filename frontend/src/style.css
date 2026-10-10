@@ -2007,3 +2007,99 @@ img, svg { display: block; }
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Auth panel inside sign-in popup ───────────────────────────── */
+.signin-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(2px);
+}
+.signin-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #666;
+}
+.signin-panel label small {
+  font-size: 11px;
+  color: #999;
+  font-weight: 400;
+  margin-left: 4px;
+}
+.auth-code-display {
+  display: block;
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-align: center;
+  margin: 18px 0;
+  color: #1a1a1a;
+  font-family: monospace;
+}
+.signin-whatsapp-btn {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  background: #25D366;
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: center;
+  border-radius: 8px;
+  text-decoration: none;
+  margin-bottom: 14px;
+}
+.signin-whatsapp-btn:hover { background: #1ebe5a; }
+.auth-help {
+  font-size: 13px;
+  color: #666;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.auth-wait-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #888;
+  margin: 12px 0 0;
+}
+.lock-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulse-dot 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.auth-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  color: #dc2626;
+  font-size: 13px;
+}
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #2563eb;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  margin-top: 8px;
+}
+.signin-privacy {
+  margin: 14px 0 0;
+  font-size: 11px;
+  color: #aaa;
+  text-align: center;
+}
