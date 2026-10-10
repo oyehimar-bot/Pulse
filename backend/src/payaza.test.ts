@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { PrismaClient } from "@prisma/client";
 import { loadConfig } from "./config.js";
-import { processPendingPayazaEvents } from "./payaza.js";
+import { buildPayazaPayoutRequest, initiatePayazaPayout, processPendingPayazaEvents } from "./payaza.js";
 
 const config = loadConfig({
   DATABASE_URL: "postgresql://pulse:pulse@localhost:5432/pulse",
@@ -94,4 +94,92 @@ test("successful Payaza payment atomically funds escrow and notifies both partie
   assert.equal(notices.length, 2);
   assert.deepEqual(notices.map((notice) => notice.to), ["+2348012345678", "+2348098765432"]);
   assert.ok(notices.every((notice) => notice.dealId === "deal-1"));
+});
+
+test("Payaza NUBAN payout uses the documented request and test headers", async () => {
+  const payoutConfig = loadConfig({
+    DATABASE_URL: "postgresql://pulse:pulse@localhost:5432/pulse",
+    SESSION_SECRET: "a-session-secret-with-at-least-32-characters",
+    PUBLIC_BASE_URL: "https://pulse.example.test",
+    FRONTEND_URL: "http://localhost:5173",
+    WHATSAPP_PHONE_NUMBER_ID: "phone-id",
+    WHATSAPP_BUSINESS_ACCOUNT_ID: "business-id",
+    WHATSAPP_ACCESS_TOKEN: "test-access-token",
+    WHATSAPP_VERIFY_TOKEN: "verify-token",
+    WHATSAPP_APP_SECRET: "app-secret",
+    PULSE_WHATSAPP_NUMBER: "+2348000000000",
+    PAYAZA_PUBLIC_KEY_TEST: "test-public-key",
+    PAYAZA_SECRET_KEY_TEST: "test-secret-key",
+    PAYAZA_TENANT_ID: "test",
+    PAYAZA_TRANSACTION_PIN: "419374",
+    PAYAZA_ACCOUNT_REFERENCE: "1010000009",
+    LICENSE_SIGNING_KEY: "a-license-signing-key-with-at-least-32-characters"
+  });
+  const request = buildPayazaPayoutRequest(payoutConfig, {
+    amountKobo: 122550n,
+    providerReference: "PULSEABC12345FEDCBA987654",
+    dealCode: "ABC12345",
+    sellerName: "Jane Seller",
+    sellerPhone: "+2348012345678",
+    senderAddress: "123 Sample Street, Lagos",
+    bankCode: "000013",
+    accountNumber: "9207067319",
+    accountName: "Jane Seller"
+  });
+  let requestUrl = "";
+  let requestHeaders = new Headers();
+  let requestBody: unknown;
+  const response = await initiatePayazaPayout(payoutConfig, request, async (input, init) => {
+    requestUrl = String(input);
+    requestHeaders = new Headers(init?.headers);
+    requestBody = JSON.parse(String(init?.body)) as unknown;
+    return new Response(JSON.stringify({ response_code: 200, response_content: { response_status: "TRANSACTION_INITIATED" } }), { status: 200 });
+  });
+
+  assert.equal(requestUrl, "https://api.payaza.africa/live/payout-receptor/payout");
+  assert.equal(requestHeaders.get("Authorization"), `Payaza ${Buffer.from(payoutConfig.PAYAZA_PUBLIC_KEY_TEST).toString("base64")}`);
+  assert.equal(requestHeaders.get("X-TenantID"), "test");
+  assert.equal(requestHeaders.get("Content-Type"), "application/json");
+  assert.deepEqual(requestBody, request);
+  assert.equal(request.service_payload.payout_amount, 1225.5);
+  assert.equal(request.service_payload.payout_beneficiaries[0]?.transaction_reference, "PULSEABC12345FEDCBA987654");
+  assert.equal(response.response_content?.response_status, "TRANSACTION_INITIATED");
+});
+
+test("successful Payaza transfer settles the payout and debits seller payable once", async () => {
+  const event = {
+    id: "payout-event-1",
+    payload: { transaction_reference: "PULSEABC12345FEDCBA987654", transaction_type: "DEBIT", transaction_status: "NIP_SUCCESS", amount_received: 1225.5 }
+  };
+  const payout = {
+    id: "payout-1",
+    dealId: "deal-1",
+    recipientId: "seller-1",
+    providerReference: "PULSEABC12345FEDCBA987654",
+    amountKobo: 122550n,
+    status: "PENDING",
+    deal: { dealCode: "ABC12345" },
+    recipient: { phone: "+2348012345678" }
+  };
+  const calls: string[] = [];
+  const transaction = {
+    payout: {
+      updateMany: async () => { calls.push("payout-succeeded"); return { count: 1 }; }
+    },
+    ledgerEntry: { create: async () => { calls.push("seller-payable-debited"); } },
+    dealEvent: { create: async () => { calls.push("payout-event-created"); } },
+    webhookEvent: { update: async () => { calls.push("webhook-processed"); } }
+  };
+  const prisma = {
+    webhookEvent: { findMany: async () => [event], update: async () => { calls.push("webhook-error"); } },
+    payout: { findUnique: async () => payout },
+    $transaction: async (work: (client: typeof transaction) => Promise<unknown>) => work(transaction)
+  } as unknown as PrismaClient;
+  const messages: string[] = [];
+
+  await processPendingPayazaEvents(prisma, config, { sendText: async (to, body) => { messages.push(`${to}: ${body}`); } });
+
+  assert.deepEqual(calls, ["payout-succeeded", "seller-payable-debited", "payout-event-created", "webhook-processed"]);
+  assert.equal(messages.length, 1);
+  assert.match(messages[0] ?? "", /Payaza confirmed payout/);
 });

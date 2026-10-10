@@ -18,6 +18,8 @@ const environmentSchema = z.object({
   PAYAZA_PUBLIC_KEY_TEST: z.string().min(1),
   PAYAZA_SECRET_KEY_TEST: z.string().min(1),
   PAYAZA_TENANT_ID: z.preprocess(blankAsUndefined, z.string().default("test")),
+  PAYAZA_TRANSACTION_PIN: z.preprocess(blankAsUndefined, z.string().regex(/^\d{6}$/).optional()),
+  PAYAZA_ACCOUNT_REFERENCE: z.preprocess(blankAsUndefined, z.string().min(1).optional()),
   ANTHROPIC_API_KEY: z.preprocess(blankAsUndefined, z.string().optional()),
   LICENSE_SIGNING_KEY: z.string().min(32),
   ESCROW_FEE_PERCENT: z.preprocess(blankAsUndefined, z.coerce.number().positive().default(2.5)),

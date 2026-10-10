@@ -24,7 +24,7 @@ To run the database-backed auth integration test, set `TEST_DATABASE_URL` to an 
 
 The API listens on `http://localhost:3000` by default and the Vite client on `http://localhost:5173`. The API's liveness endpoint is `GET /health`.
 
-All listed environment variables except `ANTHROPIC_API_KEY` are required at API startup. `WHATSAPP_API_VERSION`, `PAYAZA_TENANT_ID`, `ESCROW_FEE_PERCENT`, and `LICENSE_FEE_KOBO` default to `v25.0`, `test`, `2.5`, and `50000` respectively. Session and license signing keys must each be at least 32 characters. Never commit `.env` or share test credentials.
+All listed environment variables except `ANTHROPIC_API_KEY`, `PAYAZA_TRANSACTION_PIN`, and `PAYAZA_ACCOUNT_REFERENCE` are required at API startup. `WHATSAPP_API_VERSION`, `PAYAZA_TENANT_ID`, `ESCROW_FEE_PERCENT`, and `LICENSE_FEE_KOBO` default to `v25.0`, `test`, `2.5`, and `50000` respectively. Session and license signing keys must each be at least 32 characters. Never commit `.env` or share test credentials.
 
 After each phase is implemented and tested, commit the phase locally with a clear message such as `Phase 3: WhatsApp channel`. Never commit `.env` or secrets, and do not push unless explicitly requested.
 
@@ -34,4 +34,6 @@ Meta and Payaza must reach the local API over HTTPS. Start a tunnel such as Clou
 
 ## Current scope
 
-Phases 0 through 5 provide the service scaffold, database and auth, WhatsApp conversation flow, deal drafting, and buyer entry. Phase 6 creates a fixed-amount Payaza payment link when a buyer accepts; signed collection events are reconciled against Payaza's payment-link transaction API before escrow is marked funded. The deal, payment, audit event, ledger credit, and webhook completion are committed atomically. Configure the test credentials and apply migrations before exercising this flow against a database.
+Phases 0 through 5 provide the service scaffold, database and auth, WhatsApp conversation flow, deal drafting, and buyer entry. Phase 6 creates a fixed-amount Payaza payment link when a buyer accepts; signed collection events are reconciled against Payaza's payment-link transaction API before escrow is marked funded. Phase 7 supports seller delivery with `DELIVER <code> <note>`, buyer approval with `RELEASE DEAL-<code>`, or issue reporting with `ISSUE DEAL-<code>`. Release atomically moves escrow to the fee and seller payable ledger accounts and creates a durable payout. Sellers can register payout details with `PAYOUT <bank-code> <10-digit-account> <account-name> | <sender-address>`, confirm them with `CONFIRM PAYOUT`, and check `PAYOUT STATUS`. Unaccepted deals expire after 72 hours. Apply migrations before exercising these flows against a database.
+
+The Phase 7 release path does not submit real transfers. The Payaza NUBAN request adapter is constrained to the test tenant and is covered with injected responses. A real payout requires a configured test `PAYAZA_TRANSACTION_PIN` and `PAYAZA_ACCOUNT_REFERENCE`; both are optional at startup and must remain local secrets.

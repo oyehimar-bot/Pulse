@@ -34,11 +34,110 @@ type PayazaLinkTransactionsResponse = {
   data?: { items?: PayazaLinkTransaction[] };
 };
 
+type PayazaPayoutResponse = {
+  response_code?: number;
+  response_content?: {
+    transaction_status?: string;
+    response_status?: string;
+    response_description?: string;
+  };
+};
+
 type PaymentNotifier = { sendText(to: string, body: string, dealId?: string): Promise<unknown> };
 
 class RetryablePayazaError extends Error {}
 
 export type PayazaPaymentLink = { id: number; url: string };
+
+export type PayazaPayoutRequest = {
+  transaction_type: "nuban";
+  service_payload: {
+    payout_amount: number;
+    transaction_pin: number;
+    account_reference: string;
+    currency: "NGN";
+    country: "NGA";
+    payout_beneficiaries: Array<{
+      credit_amount: number;
+      account_number: string;
+      account_name: string;
+      bank_code: string;
+      narration: string;
+      transaction_reference: string;
+      sender: { sender_name: string; sender_phone_number: string; sender_address: string };
+    }>;
+  };
+};
+
+export function buildPayazaPayoutRequest(
+  config: AppConfig,
+  payout: {
+    amountKobo: bigint;
+    providerReference: string;
+    dealCode: string;
+    sellerName: string;
+    sellerPhone: string;
+    senderAddress: string;
+    bankCode: string;
+    accountNumber: string;
+    accountName: string;
+  }
+): PayazaPayoutRequest {
+  if (config.PAYAZA_TENANT_ID !== "test") {
+    throw new Error("Payaza payout submission is restricted to the test tenant in this phase.");
+  }
+  if (!config.PAYAZA_TRANSACTION_PIN || !config.PAYAZA_ACCOUNT_REFERENCE) {
+    throw new Error("Payaza payout credentials are not configured.");
+  }
+  if (payout.amountKobo <= 0n || payout.amountKobo > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error("Payout amount is outside the supported range.");
+  }
+
+  return {
+    transaction_type: "nuban",
+    service_payload: {
+      payout_amount: Number(payout.amountKobo) / 100,
+      transaction_pin: Number(config.PAYAZA_TRANSACTION_PIN),
+      account_reference: config.PAYAZA_ACCOUNT_REFERENCE,
+      currency: "NGN",
+      country: "NGA",
+      payout_beneficiaries: [{
+        credit_amount: Number(payout.amountKobo) / 100,
+        account_number: payout.accountNumber,
+        account_name: payout.accountName,
+        bank_code: payout.bankCode,
+        narration: `PulseDeal${payout.dealCode}`.slice(0, 25),
+        transaction_reference: payout.providerReference,
+        sender: {
+          sender_name: payout.sellerName,
+          sender_phone_number: payout.sellerPhone.replace(/\D/g, ""),
+          sender_address: payout.senderAddress
+        }
+      }]
+    }
+  };
+}
+
+export async function initiatePayazaPayout(
+  config: AppConfig,
+  request: PayazaPayoutRequest,
+  fetcher: typeof fetch = fetch
+): Promise<PayazaPayoutResponse> {
+  const response = await fetcher("https://api.payaza.africa/live/payout-receptor/payout", {
+    method: "POST",
+    headers: {
+      Authorization: `Payaza ${Buffer.from(config.PAYAZA_PUBLIC_KEY_TEST, "utf8").toString("base64")}`,
+      "X-TenantID": config.PAYAZA_TENANT_ID,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(request)
+  });
+  const result = await response.json() as PayazaPayoutResponse;
+  if (!response.ok || result.response_content?.response_status !== "TRANSACTION_INITIATED") {
+    throw new Error("Payaza did not confirm that the payout was initiated.");
+  }
+  return result;
+}
 
 export async function createPayazaPaymentLink(
   config: AppConfig,
@@ -183,6 +282,80 @@ export async function processPendingPayazaEvents(
       const providerReference = payload.transaction_reference;
       if (!providerReference) {
         throw new Error("Payaza payload is missing its transaction reference.");
+      }
+
+      if (`${payload.transaction_type ?? ""}`.toUpperCase() === "DEBIT") {
+        const reference = String(providerReference);
+        const payout = await prisma.payout.findUnique({
+          where: { providerReference: reference },
+          include: { recipient: true, deal: { select: { dealCode: true } } }
+        });
+        if (!payout) throw new Error(`No payout matches Payaza transfer ${reference}.`);
+
+        const status = `${payload.transaction_status ?? ""}`.trim().toUpperCase();
+        if ((status === "NIP_SUCCESS" && payout.status === "SUCCEEDED") || (status === "NIP_FAILURE" && payout.status === "FAILED")) {
+          await prisma.webhookEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } });
+          continue;
+        }
+        if (status === "NIP_SUCCESS") {
+          const settledAmount = amountToKobo(payload.amount_received);
+          if (settledAmount > 0n && settledAmount !== payout.amountKobo) {
+            throw new Error(`Payaza payout ${reference} amount does not match the payable amount.`);
+          }
+          let settled = false;
+          await prisma.$transaction(async (transaction) => {
+            const changed = await transaction.payout.updateMany({
+              where: { id: payout.id, status: { in: ["READY", "PENDING"] } },
+              data: { status: "SUCCEEDED", rawPayload: asJson(payload) }
+            });
+            if (changed.count !== 1) {
+              await transaction.webhookEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } });
+              return;
+            }
+            await transaction.ledgerEntry.create({
+              data: {
+                dealId: payout.dealId,
+                account: `seller:${payout.recipientId}:payable`,
+                direction: "DEBIT",
+                amountKobo: payout.amountKobo,
+                reason: `Payaza payout settled: ${reference}`
+              }
+            });
+            await transaction.dealEvent.create({
+              data: {
+                dealId: payout.dealId,
+                type: "PAYOUT_SUCCEEDED",
+                data: { providerReference: reference, amountKobo: payout.amountKobo.toString() }
+              }
+            });
+            await transaction.webhookEvent.update({ where: { id: event.id }, data: { processedAt: new Date(), processingError: null } });
+            settled = true;
+          });
+          if (settled) await notifier.sendText(payout.recipient.phone, `Payaza confirmed payout for deal ${payout.deal.dealCode}.`, payout.dealId);
+        } else if (status === "NIP_FAILURE") {
+          await prisma.$transaction(async (transaction) => {
+            const changed = await transaction.payout.updateMany({
+              where: { id: payout.id, status: { in: ["READY", "PENDING"] } },
+              data: { status: "FAILED", rawPayload: asJson(payload) }
+            });
+            if (changed.count !== 1) {
+              await transaction.webhookEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } });
+              return;
+            }
+            await transaction.dealEvent.create({
+              data: {
+                dealId: payout.dealId,
+                type: "PAYOUT_FAILED",
+                data: { providerReference: reference, responseMessage: payload.response_message ?? "Transfer failed" }
+              }
+            });
+            await transaction.webhookEvent.update({ where: { id: event.id }, data: { processedAt: new Date(), processingError: null } });
+          });
+          await notifier.sendText(payout.recipient.phone, `Payaza could not complete payout for deal ${payout.deal.dealCode}. Your proceeds remain payable; contact Pulse support before retrying.`, payout.dealId);
+        } else {
+          await prisma.webhookEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } });
+        }
+        continue;
       }
 
       const existingPayment = await prisma.payment.findUnique({

@@ -241,6 +241,7 @@ export async function confirmSellerDraft(prisma: PrismaClient, sellerPhone: stri
       rightsText: draft.rightsText,
       amountKobo: draft.amountKobo,
       status: "AWAITING_BUYER",
+      expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
       buyerVerifiedOnPulse: buyer.isPhoneVerified,
       verificationPhrase: verificationPhrase && verificationPhrase.trim().toUpperCase() !== "SKIP" ? verificationPhrase.trim() : null,
       events: {

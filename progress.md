@@ -1,10 +1,10 @@
 # Pulse Build Progress
 
-Updated: 2026-10-09
+Updated: 2026-10-10
 
 ## Current checkpoint
 
-Phases 0 through 6 are implemented and verified locally. Phase 6 uses Payaza's test payment-link API and signed webhook contract; live payments are not enabled. WhatsApp and Payaza API calls are real integrations, not mocked in the application.
+Phases 0 through 7 are implemented and verified locally. Phase 6 uses Payaza's test payment-link API and signed webhook contract. Phase 7 implements delivery, buyer release or issue reporting, escrow/fee/payout accounting, payout status reconciliation, and deal expiry. The release path intentionally does not submit a Payaza transfer in this credential-incomplete mock-only run.
 
 ## Built so far
 
@@ -45,6 +45,16 @@ Phases 0 through 6 are implemented and verified locally. Phase 6 uses Payaza's t
 - Verify the completed transaction amount, then atomically mark the payment successful, transition the deal to `FUNDED`, record the escrow ledger credit, and complete the webhook event.
 - Notify both buyer and seller after escrow funding. Persist each payment link ID for transaction reconciliation.
 
+### Phase 7: Delivery and release
+
+- Sellers submit a delivery note for funded deals; the deal transitions to `DELIVERED` with a separate delivery audit event and buyer notification.
+- Buyers can release a delivered deal or report an issue. Issues move the deal to `DISPUTED` and leave escrow untouched.
+- Buyer release atomically transitions to `RELEASED`, debits escrow, credits the configured fee and seller payable, and creates one durable `READY` payout.
+- Sellers can securely confirm bank payout details through WhatsApp; `PAYOUT STATUS` lists the latest ten payouts.
+- Signed Payaza payout events update payout state; seller payable is debited only once after `NIP_SUCCESS`, while failure leaves proceeds payable.
+- Unaccepted buyer-entry deals expire after 72 hours through an audited background worker.
+- The documented Payaza NUBAN request builder is test-tenant-only and contract-tested. No payout HTTP request is made by the Phase 7 release route in this local mock-only run.
+
 ## Verification so far
 
 - Prisma client generation and schema validation passed with matching Prisma CLI/client 6.19.0.
@@ -62,6 +72,7 @@ Phases 0 through 6 are implemented and verified locally. Phase 6 uses Payaza's t
 - Phase 2 typecheck, ESLint, production builds, schema validation, and all backend tests passed.
 - Phase 6 Payaza tests pass for the documented payment-link request, exact raw-body HMAC validation, webhook rejection/acceptance, transaction reconciliation, atomic escrow funding, and buyer/seller notices.
 - Phase 6 full backend suite, workspace build, and lint pass. The database-backed auth integration test is skipped unless `TEST_DATABASE_URL` is configured.
+- Phase 7 service tests pass for delivery audit, atomic release ledger postings and payout creation, invalid fee rejection, 72-hour expiry transitions, documented NUBAN payload construction, and successful payout settlement reconciliation.
 
 ## Open Phase 0/1 work
 
@@ -73,7 +84,6 @@ Phases 0 through 6 are implemented and verified locally. Phase 6 uses Payaza's t
 
 ## Remaining phases
 
-- **Phase 7: Delivery and release.** Delivery updates, buyer release or issue action, fee and payout ledger entries, documented Payaza transfer flow, pending payout visibility, and deal expiry timers.
 - **Phase 8: License certificate.** PDF creation, canonical-data SHA-256, QR verification URL, file storage, WhatsApp document delivery, and public verification.
 - **Phase 9: React wireframe.** Auth, dashboard, deal details with timeline/ledger/messages, license list, and public verification page, using typed REST responses.
 - **Phase 10: Demo hardening.** Written end-to-end demo procedure, request IDs and structured logs, webhook troubleshooting, and fixes for failures found.
@@ -91,3 +101,5 @@ Phases 0 through 6 are implemented and verified locally. Phase 6 uses Payaza's t
 - A workspace sorter moved the pre-existing prototype files from the repository root into `save/`. Those files remain present there. This build did not intentionally edit or delete the prototypes; their relocation appears in Git as deletions at the old paths and an untracked `save/` directory.
 - Payaza test credentials are configured locally. Apply the Phase 6 migration with `npm run db:migrate` before running the payment flow against a persistent database.
 - Payaza must be configured to send collection webhooks to `/webhooks/payaza` on the public HTTPS API origin. Live payments remain out of scope for Phase 6.
+- `PAYAZA_TRANSACTION_PIN` and `PAYAZA_ACCOUNT_REFERENCE` are currently missing from local `.env`; they are optional config and must be supplied locally before a real transfer adapter can be used. Phase 7 release currently only queues `READY` payouts; no transfer was submitted.
+- WhatsApp seller payout setup uses `PAYOUT <bank-code> <10-digit-account> <account-name> | <sender-address>`, followed by `CONFIRM PAYOUT`. Sellers can view statuses with `PAYOUT STATUS`; buyers use `RELEASE DEAL-<code>` or `ISSUE DEAL-<code>`, and sellers use `DELIVER <code> <delivery note>`.

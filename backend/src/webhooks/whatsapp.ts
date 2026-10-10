@@ -20,6 +20,7 @@ import {
   setBuyerDecisionContext,
   setSellerDraft
 } from "../deals/drafting.js";
+import { submitDealDelivery, releaseDealToPayout } from "../deals/delivery.js";
 import { transitionDeal } from "../deals/transitions.js";
 import { getOrCreatePayazaPaymentLink } from "../payaza.js";
 import { WhatsAppSender } from "../whatsapp/sender.js";
@@ -137,11 +138,136 @@ async function processMessage(
     await consumeWhatsAppProof(prisma, config, phone, body);
   }
 
+  const deliveryCommand = body.match(/^deliver\s+([A-Z0-9]{6,8})\s+([\s\S]{1,1500})$/i);
+  const buyerAction = body.match(/^(?:RELEASE|ISSUE)\s+DEAL-([A-Z0-9]{6,8})$/i);
+  const payoutDetailsCommand = body.match(/^PAYOUT\s+(\d{3,8})\s+(\d{10})\s+(.+?)\s*\|\s*(.{8,160})$/i);
+  const payoutStatusCommand = body.trim().toUpperCase() === "PAYOUT STATUS";
+  const phaseSevenCommand = Boolean(deliveryCommand || buyerAction || payoutDetailsCommand || payoutStatusCommand || body.trim().toUpperCase() === "CONFIRM PAYOUT");
+
+  if (payoutStatusCommand) {
+    const user = await prisma.user.findUnique({ where: { phone }, select: { id: true } });
+    if (!user) {
+      await sender.sendText(phone, "No seller account was found for this number.");
+    } else {
+      const payouts = await prisma.payout.findMany({
+        where: { recipientId: user.id },
+        include: { deal: { select: { dealCode: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 10
+      });
+      const statusText = payouts.length
+        ? payouts.map((payout) => `${payout.deal.dealCode}: ${payout.status} (${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(Number(payout.amountKobo) / 100)})`).join("\n")
+        : "No payouts found.";
+      await sender.sendText(phone, statusText);
+    }
+  } else if (payoutDetailsCommand) {
+    const bankCode = payoutDetailsCommand[1];
+    const accountNumber = payoutDetailsCommand[2];
+    const accountName = payoutDetailsCommand[3]?.trim();
+    const senderAddress = payoutDetailsCommand[4]?.trim();
+    if (!bankCode || !accountNumber || !accountName || !senderAddress) {
+      await sender.sendText(phone, "Payout details are incomplete. Send PAYOUT <bank-code> <10-digit-account> <account-name> | <sender-address>.");
+      return;
+    }
+    await prisma.user.update({
+      where: { phone },
+      data: {
+        payoutBankCode: bankCode,
+        payoutAccountNumber: accountNumber,
+        payoutAccountName: accountName,
+        payoutSenderAddress: senderAddress,
+        payoutDetailsConfirmed: false
+      }
+    });
+    await sender.sendText(phone, `Payout details received for account ${accountNumber} (${accountName}). Reply CONFIRM PAYOUT to authorize using these details for future releases.`);
+  } else if (body.toUpperCase() === "CONFIRM PAYOUT") {
+    const confirmed = await prisma.$transaction(async (transaction) => {
+      const user = await transaction.user.findUnique({ where: { phone } });
+      if (!user?.payoutBankCode || !user.payoutAccountNumber || !user.payoutAccountName || !user.payoutSenderAddress) return null;
+      await transaction.user.update({ where: { id: user.id }, data: { payoutDetailsConfirmed: true } });
+      const updatedPayouts = await transaction.payout.updateMany({
+        where: { recipientId: user.id, status: "READY", bankCode: null },
+        data: {
+          bankCode: user.payoutBankCode,
+          accountNumber: user.payoutAccountNumber,
+          accountName: user.payoutAccountName
+        }
+      });
+      return updatedPayouts.count;
+    });
+    await sender.sendText(phone, confirmed !== null ? `Payout details confirmed. ${confirmed} ready payout(s) now have the confirmed bank details.` : "No complete payout details are waiting for confirmation. Send PAYOUT <bank-code> <10-digit-account> <account-name> | <sender-address> first.");
+  } else if (deliveryCommand) {
+    const dealCode = deliveryCommand[1]?.toUpperCase();
+    const deliveryNote = deliveryCommand[2]?.trim();
+    if (!dealCode || !deliveryNote) return;
+    const deal = await prisma.deal.findFirst({
+      where: { dealCode, status: "FUNDED", seller: { phone } },
+      include: { buyer: true }
+    });
+    if (!deal) {
+      await sender.sendText(phone, "That funded deal was not found for your seller account.");
+    } else {
+      await submitDealDelivery(prisma, { dealId: deal.id, sellerId: deal.sellerId, note: deliveryNote });
+      if (deal.buyerPhone) {
+        await sender.sendText(deal.buyerPhone, `The seller delivered deal ${deal.dealCode}: ${deliveryNote}\nReply RELEASE DEAL-${deal.dealCode} to approve release, or ISSUE DEAL-${deal.dealCode} to report a problem.`, deal.id);
+      }
+      await sender.sendText(phone, `Delivery submitted for deal ${deal.dealCode}. The buyer has been notified.`, deal.id);
+    }
+  } else if (buyerAction) {
+    const dealCode = buyerAction[1]?.toUpperCase();
+    if (!dealCode) return;
+    const deal = await prisma.deal.findFirst({
+      where: { dealCode, buyerPhone: phone, status: "DELIVERED" },
+      include: { seller: true, buyer: true }
+    });
+    if (!deal) {
+      await sender.sendText(phone, "That delivered deal was not found for your buyer account.");
+    } else if (body.toUpperCase().startsWith("ISSUE")) {
+      await transitionDeal(prisma, {
+        dealId: deal.id,
+        to: "DISPUTED",
+        data: { source: "buyer_whatsapp", action: "issue" }
+      });
+      await sender.sendText(phone, `Deal ${deal.dealCode} is under review. Escrow remains held while the issue is reviewed.`, deal.id);
+      await sender.sendText(deal.seller.phone, `The buyer reported an issue with deal ${deal.dealCode}. Funds remain held; do not initiate a payout.`, deal.id);
+    } else {
+      const seller = await prisma.user.findUnique({ where: { id: deal.sellerId }, select: { id: true, displayName: true, phone: true, payoutBankCode: true, payoutAccountNumber: true, payoutAccountName: true, payoutSenderAddress: true, payoutDetailsConfirmed: true } });
+      if (!seller) throw new Error("Deal seller was not found.");
+      let released;
+      try {
+        released = await releaseDealToPayout(prisma, {
+          dealId: deal.id,
+          dealCode: deal.dealCode,
+          sellerId: deal.sellerId,
+          amountKobo: deal.amountKobo,
+          feePercent: config.ESCROW_FEE_PERCENT,
+          ...(seller.payoutDetailsConfirmed && seller.payoutBankCode && seller.payoutAccountNumber && seller.payoutAccountName ? {
+            payoutDetails: {
+              bankCode: seller.payoutBankCode,
+              accountNumber: seller.payoutAccountNumber,
+              accountName: seller.payoutAccountName
+            }
+          } : {})
+        });
+      } catch (error) {
+        if (error instanceof Error && error.message === "The escrow fee must be less than the deal amount.") {
+          await sender.sendText(phone, "This deal cannot be released because its configured fee is at least the deal amount. Contact Pulse support.");
+          return;
+        }
+        throw error;
+      }
+
+      const payoutMessage = seller.payoutDetailsConfirmed ? "Your payout is ready for processing" : "Your payout is waiting for confirmed payout details";
+      await sender.sendText(phone, `You released deal ${deal.dealCode}. The seller's payout is ${seller.payoutDetailsConfirmed ? "ready for processing" : "waiting for confirmed payout details"}.`, deal.id);
+      await sender.sendText(deal.seller.phone, `Deal ${deal.dealCode} was released. Your net proceeds are ${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(Number(released.sellerAmountKobo) / 100)}. ${payoutMessage}.`, deal.id);
+    }
+  }
+
   const currentDraft = getSellerDraft(phone);
   const stage = getDraftStage(phone);
   const buyerDecisionCode = getBuyerDecisionContext(phone);
 
-  if (body.toLowerCase().includes("accept_deal") || body.toLowerCase().includes("decline_deal")) {
+  if (!phaseSevenCommand && (body.toLowerCase().includes("accept_deal") || body.toLowerCase().includes("decline_deal"))) {
     const fallbackDeal = buyerDecisionCode ? null : await prisma.deal.findFirst({
       where: { buyerPhone: phone, status: "AWAITING_BUYER" },
       select: { dealCode: true },
@@ -190,7 +316,7 @@ async function processMessage(
         }
       }
     }
-  } else if (/^DEAL-[A-Z0-9]{6,8}$/i.test(body)) {
+  } else if (!phaseSevenCommand && /^DEAL-[A-Z0-9]{6,8}$/i.test(body)) {
     const normalizedCode = body.trim().replace(/^DEAL-/i, "").toUpperCase();
     const deal = await prisma.deal.findFirst({
       where: { dealCode: normalizedCode, status: "AWAITING_BUYER" },
@@ -229,15 +355,15 @@ async function processMessage(
         { id: "decline_deal", title: "Decline Deal" }
       ]);
     }
-  } else if (body.includes("deal_confirm")) {
+  } else if (!phaseSevenCommand && body.includes("deal_confirm")) {
     if (currentDraft) {
       markDraftAwaitingVerification(phone);
       await sender.sendText(phone, nextDraftPrompt());
     }
-  } else if (body.includes("deal_edit")) {
+  } else if (!phaseSevenCommand && body.includes("deal_edit")) {
     clearSellerDraft(phone);
     await sender.sendText(phone, "Please send the corrected deal message and I will refresh the draft.");
-  } else if (stage === "AWAITING_VERIFICATION") {
+  } else if (!phaseSevenCommand && stage === "AWAITING_VERIFICATION") {
     const phrase = body.trim().toUpperCase() === "SKIP" ? null : body.trim() || null;
     const createdDeal = await confirmSellerDraft(prisma, phone, phrase);
     if (createdDeal) {
@@ -251,7 +377,7 @@ async function processMessage(
     } else {
       await sender.sendText(phone, "I could not save that draft. Please send the deal message again to start a fresh draft.");
     }
-  } else {
+  } else if (!phaseSevenCommand) {
     const parsedDraft = await parseDealDraftText(body);
     if (parsedDraft) {
       setSellerDraft(phone, parsedDraft);

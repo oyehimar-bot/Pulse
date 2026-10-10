@@ -26,6 +26,13 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum PayoutStatus {
+  READY
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
 enum WebhookSource {
   META
   PAYAZA
@@ -50,12 +57,18 @@ model User {
   isBuyer              Boolean       @default(false) @map("is_buyer")
   isPhoneVerified      Boolean       @default(false) @map("is_phone_verified")
   verificationPhrase   String        @default("Not set") @map("verification_phrase")
+  payoutBankCode       String?       @map("payout_bank_code")
+  payoutAccountNumber  String?       @map("payout_account_number")
+  payoutAccountName    String?       @map("payout_account_name")
+  payoutSenderAddress  String?       @map("payout_sender_address") @db.Text
+  payoutDetailsConfirmed Boolean     @default(false) @map("payout_details_confirmed")
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
   sessions             Session[]
   sellerDeals          Deal[]        @relation("SellerDeals")
   buyerDeals           Deal[]        @relation("BuyerDeals")
   messages             Message[]
+  payouts              Payout[]      @relation("PayoutRecipient")
 
   @@index([phone, isPhoneVerified])
   @@map("users")
@@ -131,6 +144,7 @@ model Deal {
   payments           Payment[]
   messages           Message[]
   license            License?
+  payout             Payout?
 
   @@index([sellerId, status, createdAt])
   @@index([buyerId, status, createdAt])
@@ -185,6 +199,26 @@ model Payment {
 
   @@index([dealId, status])
   @@map("payments")
+}
+
+model Payout {
+  id               String       @id @default(cuid())
+  dealId           String       @unique @map("deal_id")
+  recipientId      String       @map("recipient_id")
+  providerReference String      @unique @map("provider_reference")
+  amountKobo       BigInt       @map("amount_kobo")
+  bankCode         String?      @map("bank_code")
+  accountNumber    String?      @map("account_number")
+  accountName      String?      @map("account_name")
+  status           PayoutStatus @default(READY)
+  rawPayload       Json?        @map("raw_payload")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  deal             Deal         @relation(fields: [dealId], references: [id], onDelete: Restrict)
+  recipient        User         @relation("PayoutRecipient", fields: [recipientId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@map("payouts")
 }
 
 model WebhookEvent {
