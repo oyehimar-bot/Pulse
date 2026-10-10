@@ -6,6 +6,8 @@ Updated: 2026-10-10
 
 Phases 0 through 9 are implemented and verified locally. Phase 6 uses Payaza's test payment-link API and signed webhook contract. Phase 7 implements delivery, buyer release or issue reporting, escrow/fee/payout accounting, payout status reconciliation, and deal expiry. Phase 8 issues a canonical-data-hashed PDF certificate after release and exposes public verification. Phase 9 adds a session-protected React workspace and typed read APIs. The release path intentionally does not submit a Payaza transfer in this credential-incomplete mock-only run.
 
+The frontend redesign work (Task 2) and the full local smoke test (Task 3) are still pending. Task 1, the frontend/backend connection fix, is complete and committed.
+
 ## Built so far
 
 ### Phase 0: Scaffold
@@ -71,6 +73,14 @@ Phases 0 through 9 are implemented and verified locally. Phase 6 uses Payaza's t
 - Return typed, money-safe DTOs with kobo values represented as decimal strings; keep payout bank details and provider raw payloads out of dashboard responses.
 - Show per-deal timeline, ledger, payment/payout state, linked messages, and certificate verification/PDF links.
 
+### Task 1: Frontend/backend connection fix (2026-10-10)
+
+- Root cause 1: `VITE_API_BASE_URL` in the root `.env` pointed at `http://localhost:5173`, the Vite dev server itself, so `POST /auth/challenges` hit the frontend and returned 404. It now points at the backend, `http://localhost:3000`.
+- Root cause 2: `FRONTEND_URL` had a trailing slash (`http://localhost:5173/`), which does not match the browser `Origin` header. It is now `http://localhost:5173` so the CORS allow-origin comparison succeeds.
+- Root cause 3: `PUBLIC_BASE_URL` pointed at the Railway HTTPS origin, which made the session cookie use `SameSite=None; Secure`. That combination is rejected by a plain local HTTP browser. Local dev now uses `http://localhost:3000`, so the cookie falls back to `SameSite=Lax` with no `Secure` flag. The Railway production value is preserved as a comment in `.env` for deployment.
+- No code changes were required. `backend/src/app.ts` already derives CORS origin from `FRONTEND_URL` and cookie attributes from the `PUBLIC_BASE_URL` protocol, and `frontend/vite.config.ts` already reads env from the repository root via `envDir: ".."`.
+- `.env` remains gitignored, so these values stay local and are documented here instead of committed.
+
 ## Verification so far
 
 - Prisma client generation and schema validation passed with matching Prisma CLI/client 6.19.0.
@@ -91,6 +101,12 @@ Phases 0 through 9 are implemented and verified locally. Phase 6 uses Payaza's t
 - Phase 7 service tests pass for delivery audit, atomic release ledger postings and payout creation, invalid fee rejection, 72-hour expiry transitions, documented NUBAN payload construction, and successful payout settlement reconciliation.
 - Phase 8 tests pass for deterministic canonical hashing, snapshot tamper detection, release-only/idempotent issuance, QR-backed PDF generation, public verification, and PDF serving.
 - Phase 9 dashboard API tests pass for unauthenticated rejection, scoped dashboard reads, deal-detail monetary serialization, and certificate-link generation.
+- Task 1: a fresh disposable PostgreSQL 18 cluster was started on port 55439 under `/tmp` and all seven migrations deployed with `prisma migrate deploy`, matching the configured `DATABASE_URL`.
+- Task 1: backend `GET /health` returned `{"status":"ok","service":"pulse-api"}` and the Vite dev server served the app on port 5173.
+- Task 1: the served `api.ts` module from Vite injects `VITE_API_BASE_URL` as `http://localhost:3000`, so all API calls target the backend.
+- Task 1: `OPTIONS` preflight and `POST /auth/challenges` from origin `http://localhost:5173` both returned `access-control-allow-origin: http://localhost:5173` and `access-control-allow-credentials: true`; the POST returned 201 with a challenge payload.
+- Task 1: a real headless Chrome session loaded `http://localhost:5173`, the auth screen rendered with no page console errors, and submitting the form issued `GET /auth/me`, `POST /auth/challenges`, and polling `GET /auth/challenges/:id` all against `http://localhost:3000`. The one-time code and the `wa.me` WhatsApp link rendered correctly, and the polling status showed `PENDING` as expected before a real WhatsApp proof arrives.
+- Task 1: the only browser console entries were the expected pre-login `401` from `GET /auth/me` and a cosmetic `favicon.ico` 404 on the Vite dev server. Neither is a connection failure.
 
 ## Open Phase 0/1 work
 
@@ -102,6 +118,8 @@ Phases 0 through 9 are implemented and verified locally. Phase 6 uses Payaza's t
 
 ## Remaining phases
 
+- **Task 2: Rebuild the frontend visual layer.** Replace the green forest theme in `frontend/src/style.css`, `Workspace.tsx`, and `VerificationPage.tsx` with the midnight and glass design system from the `saved/` reference files, without touching any API calls, state, routing, or types.
+- **Task 3: Smoke test the full connection.** Exercise login through a real WhatsApp proof, then confirm the dashboard, deal panel, licenses page, and public verify page all load against the redesigned frontend.
 - **Phase 10: Demo hardening.** Written end-to-end demo procedure, request IDs and structured logs, webhook troubleshooting, and fixes for failures found.
 
 ## Build workflow rule
@@ -120,3 +138,5 @@ Phases 0 through 9 are implemented and verified locally. Phase 6 uses Payaza's t
 - `PAYAZA_TRANSACTION_PIN` and `PAYAZA_ACCOUNT_REFERENCE` are currently missing from local `.env`; they are optional config and must be supplied locally before a real transfer adapter can be used. Phase 7 release currently only queues `READY` payouts; no transfer was submitted.
 - WhatsApp seller payout setup uses `PAYOUT <bank-code> <10-digit-account> <account-name> | <sender-address>`, followed by `CONFIRM PAYOUT`. Sellers can view statuses with `PAYOUT STATUS`; buyers use `RELEASE DEAL-<code>` or `ISSUE DEAL-<code>`, and sellers use `DELIVER <code> <delivery note>`.
 - Apply the Phase 8 migration before issuing certificates against a persistent database. Certificate PDFs are stored locally in ignored `backend/storage/licenses/`; production deployment must mount durable storage or replace this path with an object-storage backend.
+- Local dev on this machine runs against a disposable PostgreSQL 18 cluster under `/tmp/pulse-pg` on port 55439, started for the Task 1 verification. It is recreated from `prisma migrate deploy` and is not durable; point `DATABASE_URL` at a persistent database before the Task 3 smoke test if seeded demo data should survive.
+- Backend and frontend dev servers were left running for the redesign work: backend via `npm run dev --workspace backend` on port 3000, frontend via `npm run dev --workspace frontend` on port 5173.
