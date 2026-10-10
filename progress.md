@@ -83,6 +83,22 @@ The frontend redesign work (Task 2) and the full local smoke test (Task 3) are s
 
 ## Verification so far
 
+### Task 2: Frontend visual rebuild (2026-10-10)
+
+- Replaced `frontend/src/style.css` entirely. The green forest theme is gone; the file now defines the official Pulse palette as CSS custom properties, imports Poppins and Inter from Google Fonts, and applies the dark midnight canvas plus glass-morphism cards described in the spec.
+- Key tokens now live in `:root`: `--bg-midnight: #0B081E`, `--surface-card: rgba(24,18,54,0.7)`, the blue/violet/green/burgundy primary and dark pairs, `--text-white`, and `--text-muted`, with derived glow and glass-border effects.
+- General look: `#0B081E` on `body`, glass cards at 20px radius with `rgba(255,255,255,0.16)` borders and `0 24px 48px rgba(4,2,16,.45)` shadows, gradient buttons, all text white or muted on dark.
+- Rebuilt screen by screen: auth screen (midnight canvas, centered glass card, blue-gradient logo mark, Poppins heading, full-width blue-gradient Continue with WhatsApp button, one-time code and WhatsApp link, polling indicator); sidebar (midnight with glass right border, brand lockup, glass workspace switcher, muted nav with blue active border, green secure note, avatar profile button); sticky glass topbar (breadcrumbs, pulsing green live dot, mono date); overview (four metric cards in spec order with blue/green/violet/burgundy-gold icons, recent deals table, recent licenses aside); deals page (searchable table, per-status color-coded pill badges, row click opens the panel); deal panel (right-side sliding sheet, large deal code and amount, event timeline, ledger table, chat-style message bubbles with outbound blue right-aligned and inbound violet left-aligned, green Release and burgundy Raise issue actions for a delivered deal owned by the buyer); licenses page (dark glass certificate grid, mono certificate number, rights and amount, Verify and Open PDF links); and the public verification page (large Valid in green or Invalid in red, certificate number, deal summary, issued date, hash box, PDF link).
+- `Workspace.tsx` and `VerificationPage.tsx` changed only in class names, component markup, and text presentation. No API call, state variable, effect, or TypeScript type was altered, and `frontend/src/api.ts` was not touched.
+- The Release and Raise issue buttons in the deal panel are rendered per spec but do not call an HTTP endpoint, because the backend exposes no release or issue route; release and issue run through the WhatsApp command flow. Clicking either button shows the matching WhatsApp instruction instead of a network call. This required one new local state variable (`actionNote`) and no new API integration.
+- The verification page ISSUED fallback text changed from an em dash to "Not recorded" to honor the no-em-dash rule.
+- Verification used the real dev stack, not mocks: Vite on 5173 and the API on 3000, with a headless Chrome session driving the built frontend. The auth screen, signed-in dashboard, deals table, deal panel, and public verify page all rendered with zero browser console errors.
+- Dashboard confirmed: sidebar, topbar, and all four metric cards present, `body` background computed to `rgb(11, 8, 30)`, heading font computed to Poppins, and five recent deal rows rendered.
+- Public verification confirmed end to end: the certificate number `PULSE-LIC-LIC7001-A1B2C3D4` returns `valid: true` from the real API, the page renders the `is-valid` card with the Valid heading, all six detail fields, the hash box, and a PDF link pointing at the API origin.
+- Verified statuses: deals table renders color-coded pills for Released, Delivered, and Draft; the deal panel shows both chat bubble directions with their gradient backgrounds, the event timeline, ledger, and the release/issue actions.
+- Verification fixtures were created only in the disposable database: a delivered deal, a released deal with a license whose certificate number satisfies the existing verify route regex, and a message pair on the delivered deal. These exist to exercise the layouts and were not added to the repository seed.
+- One environment note for future verification runs: the existing license verify route gates the certificate number on the pattern `^PULSE-LIC-[A-Z0-9]{6,8}-[A-F0-9]{8}$`, so the deal-code segment must be 6 to 8 characters. This is pre-existing backend behavior and was left unchanged.
+
 - Prisma client generation and schema validation passed with matching Prisma CLI/client 6.19.0.
 - Workspace typecheck, ESLint, production builds, and the backend test suite passed.
 - The backend test suite verifies blank environment defaults, missing required values, and `GET /health` returning 200.
@@ -118,7 +134,6 @@ The frontend redesign work (Task 2) and the full local smoke test (Task 3) are s
 
 ## Remaining phases
 
-- **Task 2: Rebuild the frontend visual layer.** Replace the green forest theme in `frontend/src/style.css`, `Workspace.tsx`, and `VerificationPage.tsx` with the midnight and glass design system from the `saved/` reference files, without touching any API calls, state, routing, or types.
 - **Task 3: Smoke test the full connection.** Exercise login through a real WhatsApp proof, then confirm the dashboard, deal panel, licenses page, and public verify page all load against the redesigned frontend.
 - **Phase 10: Demo hardening.** Written end-to-end demo procedure, request IDs and structured logs, webhook troubleshooting, and fixes for failures found.
 
