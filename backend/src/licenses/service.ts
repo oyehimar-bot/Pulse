@@ -93,7 +93,7 @@ export async function renderLicensePdf(data: LicenseSnapshot, hash: string, veri
 }
 
 function verificationUrl(config: AppConfig, certificateNumber: string): string {
-  return new URL(`/licenses/${encodeURIComponent(certificateNumber)}/verify`, config.PUBLIC_BASE_URL).toString();
+  return new URL(`/verify/${encodeURIComponent(certificateNumber)}`, config.FRONTEND_URL).toString();
 }
 
 function localCertificatePath(certificateNumber: string, storageDirectory: string): string {

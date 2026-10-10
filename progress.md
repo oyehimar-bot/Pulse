@@ -4,7 +4,7 @@ Updated: 2026-10-10
 
 ## Current checkpoint
 
-Phases 0 through 8 are implemented and verified locally. Phase 6 uses Payaza's test payment-link API and signed webhook contract. Phase 7 implements delivery, buyer release or issue reporting, escrow/fee/payout accounting, payout status reconciliation, and deal expiry. Phase 8 issues a canonical-data-hashed PDF certificate after release and exposes public verification. The release path intentionally does not submit a Payaza transfer in this credential-incomplete mock-only run.
+Phases 0 through 9 are implemented and verified locally. Phase 6 uses Payaza's test payment-link API and signed webhook contract. Phase 7 implements delivery, buyer release or issue reporting, escrow/fee/payout accounting, payout status reconciliation, and deal expiry. Phase 8 issues a canonical-data-hashed PDF certificate after release and exposes public verification. Phase 9 adds a session-protected React workspace and typed read APIs. The release path intentionally does not submit a Payaza transfer in this credential-incomplete mock-only run.
 
 ## Built so far
 
@@ -63,6 +63,14 @@ Phases 0 through 8 are implemented and verified locally. Phase 6 uses Payaza's t
 - Send the PDF and verification URL to both buyer and seller using the existing WhatsApp document sender.
 - Public `GET /licenses/:certificateNumber/verify` rehashes the stored snapshot; `GET /licenses/:certificateNumber.pdf` serves the certificate only when the snapshot hash is valid.
 
+### Phase 9: React workspace
+
+- Replace the auth-only frontend shell with an operational overview, searchable deal register, deal detail panel, certificate list, and public certificate verification page.
+- Preserve WhatsApp proof signup/login and session logout as the workspace entry flow.
+- Add session-protected `GET /api/dashboard`, `GET /api/deals/:dealCode`, and `GET /api/licenses` endpoints scoped to the signed-in buyer/seller.
+- Return typed, money-safe DTOs with kobo values represented as decimal strings; keep payout bank details and provider raw payloads out of dashboard responses.
+- Show per-deal timeline, ledger, payment/payout state, linked messages, and certificate verification/PDF links.
+
 ## Verification so far
 
 - Prisma client generation and schema validation passed with matching Prisma CLI/client 6.19.0.
@@ -82,6 +90,7 @@ Phases 0 through 8 are implemented and verified locally. Phase 6 uses Payaza's t
 - Phase 6 full backend suite, workspace build, and lint pass. The database-backed auth integration test is skipped unless `TEST_DATABASE_URL` is configured.
 - Phase 7 service tests pass for delivery audit, atomic release ledger postings and payout creation, invalid fee rejection, 72-hour expiry transitions, documented NUBAN payload construction, and successful payout settlement reconciliation.
 - Phase 8 tests pass for deterministic canonical hashing, snapshot tamper detection, release-only/idempotent issuance, QR-backed PDF generation, public verification, and PDF serving.
+- Phase 9 dashboard API tests pass for unauthenticated rejection, scoped dashboard reads, deal-detail monetary serialization, and certificate-link generation.
 
 ## Open Phase 0/1 work
 
@@ -93,7 +102,6 @@ Phases 0 through 8 are implemented and verified locally. Phase 6 uses Payaza's t
 
 ## Remaining phases
 
-- **Phase 9: React wireframe.** Auth, dashboard, deal details with timeline/ledger/messages, license list, and public verification page, using typed REST responses.
 - **Phase 10: Demo hardening.** Written end-to-end demo procedure, request IDs and structured logs, webhook troubleshooting, and fixes for failures found.
 
 ## Build workflow rule

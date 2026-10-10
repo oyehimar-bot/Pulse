@@ -13,6 +13,7 @@ import {
   issueChallengeSession
 } from "./auth/service.js";
 import type { AppConfig } from "./config.js";
+import { registerDashboardRoutes } from "./dashboard/routes.js";
 import { registerDealExpiryWorker } from "./deals/expiry.js";
 import { registerLicenseRoutes } from "./licenses/service.js";
 import { registerPayazaWebhook } from "./payaza.js";
@@ -112,6 +113,7 @@ export async function buildApp(config: AppConfig, prisma = new PrismaClient()) {
   });
 
   const whatsappSender = new WhatsAppSender(prisma, config);
+  registerDashboardRoutes(app, prisma, config);
   registerDealExpiryWorker(app, prisma);
   registerLicenseRoutes(app, prisma, config);
   registerWhatsAppWebhook(app, prisma, config);
