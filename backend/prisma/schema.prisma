@@ -260,6 +260,7 @@ model License {
   dealId            String   @unique @map("deal_id")
   certificateNumber String   @unique @map("certificate_number")
   sha256Hash        String   @map("sha256_hash")
+  canonicalData     Json     @map("canonical_data")
   filePath          String   @map("file_path")
   createdAt         DateTime @default(now()) @map("created_at")
   deal              Deal     @relation(fields: [dealId], references: [id], onDelete: Restrict)

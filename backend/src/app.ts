@@ -14,6 +14,7 @@ import {
 } from "./auth/service.js";
 import type { AppConfig } from "./config.js";
 import { registerDealExpiryWorker } from "./deals/expiry.js";
+import { registerLicenseRoutes } from "./licenses/service.js";
 import { registerPayazaWebhook } from "./payaza.js";
 import { registerWhatsAppWebhook } from "./webhooks/whatsapp.js";
 import { WhatsAppSender } from "./whatsapp/sender.js";
@@ -112,6 +113,7 @@ export async function buildApp(config: AppConfig, prisma = new PrismaClient()) {
 
   const whatsappSender = new WhatsAppSender(prisma, config);
   registerDealExpiryWorker(app, prisma);
+  registerLicenseRoutes(app, prisma, config);
   registerWhatsAppWebhook(app, prisma, config);
   registerPayazaWebhook(app, prisma, config, whatsappSender);
 

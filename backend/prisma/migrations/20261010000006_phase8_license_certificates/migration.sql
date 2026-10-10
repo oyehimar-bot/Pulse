@@ -1,0 +1,1 @@
+ALTER TABLE "licenses" ADD COLUMN "canonical_data" JSONB NOT NULL DEFAULT '{}'::jsonb;

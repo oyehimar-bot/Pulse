@@ -22,6 +22,7 @@ import {
 } from "../deals/drafting.js";
 import { submitDealDelivery, releaseDealToPayout } from "../deals/delivery.js";
 import { transitionDeal } from "../deals/transitions.js";
+import { issueLicenseForDeal } from "../licenses/service.js";
 import { getOrCreatePayazaPaymentLink } from "../payaza.js";
 import { WhatsAppSender } from "../whatsapp/sender.js";
 
@@ -260,6 +261,21 @@ async function processMessage(
       const payoutMessage = seller.payoutDetailsConfirmed ? "Your payout is ready for processing" : "Your payout is waiting for confirmed payout details";
       await sender.sendText(phone, `You released deal ${deal.dealCode}. The seller's payout is ${seller.payoutDetailsConfirmed ? "ready for processing" : "waiting for confirmed payout details"}.`, deal.id);
       await sender.sendText(deal.seller.phone, `Deal ${deal.dealCode} was released. Your net proceeds are ${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(Number(released.sellerAmountKobo) / 100)}. ${payoutMessage}.`, deal.id);
+      try {
+        const certificate = await issueLicenseForDeal(prisma, config, deal.id);
+        const recipients = new Set([deal.buyerPhone, deal.seller.phone].filter((recipient): recipient is string => Boolean(recipient)));
+        await Promise.allSettled([...recipients].map((recipient) => sender.sendDocument(recipient, {
+          bytes: certificate.bytes,
+          fileName: `${certificate.certificateNumber}.pdf`,
+          mimeType: "application/pdf",
+          caption: `Pulse license certificate for deal ${deal.dealCode}. Verify: ${certificate.verificationUrl}`
+        }, deal.id)));
+      } catch {
+        await Promise.allSettled([
+          sender.sendText(deal.buyerPhone ?? phone, `Deal ${deal.dealCode} was released, but the certificate could not be generated. Contact Pulse support with this deal code.`, deal.id),
+          sender.sendText(deal.seller.phone, `Deal ${deal.dealCode} was released, but the certificate could not be generated. Contact Pulse support with this deal code.`, deal.id)
+        ]);
+      }
     }
   }
 

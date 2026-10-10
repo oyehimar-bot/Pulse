@@ -4,7 +4,7 @@ Updated: 2026-10-10
 
 ## Current checkpoint
 
-Phases 0 through 7 are implemented and verified locally. Phase 6 uses Payaza's test payment-link API and signed webhook contract. Phase 7 implements delivery, buyer release or issue reporting, escrow/fee/payout accounting, payout status reconciliation, and deal expiry. The release path intentionally does not submit a Payaza transfer in this credential-incomplete mock-only run.
+Phases 0 through 8 are implemented and verified locally. Phase 6 uses Payaza's test payment-link API and signed webhook contract. Phase 7 implements delivery, buyer release or issue reporting, escrow/fee/payout accounting, payout status reconciliation, and deal expiry. Phase 8 issues a canonical-data-hashed PDF certificate after release and exposes public verification. The release path intentionally does not submit a Payaza transfer in this credential-incomplete mock-only run.
 
 ## Built so far
 
@@ -55,6 +55,14 @@ Phases 0 through 7 are implemented and verified locally. Phase 6 uses Payaza's t
 - Unaccepted buyer-entry deals expire after 72 hours through an audited background worker.
 - The documented Payaza NUBAN request builder is test-tenant-only and contract-tested. No payout HTTP request is made by the Phase 7 release route in this local mock-only run.
 
+### Phase 8: License certificate
+
+- After buyer release, create one idempotent license certificate per deal from an immutable canonical snapshot of the deal, parties, rights, value, and issuance time.
+- Compute a deterministic SHA-256 over recursively key-sorted canonical JSON and persist both the snapshot and hash.
+- Render an A4 PDF with the certificate number, parties, work, rights, deal value, integrity hash, and QR verification URL. Store it under ignored `backend/storage/licenses/` with private file permissions and atomic rename.
+- Send the PDF and verification URL to both buyer and seller using the existing WhatsApp document sender.
+- Public `GET /licenses/:certificateNumber/verify` rehashes the stored snapshot; `GET /licenses/:certificateNumber.pdf` serves the certificate only when the snapshot hash is valid.
+
 ## Verification so far
 
 - Prisma client generation and schema validation passed with matching Prisma CLI/client 6.19.0.
@@ -73,6 +81,7 @@ Phases 0 through 7 are implemented and verified locally. Phase 6 uses Payaza's t
 - Phase 6 Payaza tests pass for the documented payment-link request, exact raw-body HMAC validation, webhook rejection/acceptance, transaction reconciliation, atomic escrow funding, and buyer/seller notices.
 - Phase 6 full backend suite, workspace build, and lint pass. The database-backed auth integration test is skipped unless `TEST_DATABASE_URL` is configured.
 - Phase 7 service tests pass for delivery audit, atomic release ledger postings and payout creation, invalid fee rejection, 72-hour expiry transitions, documented NUBAN payload construction, and successful payout settlement reconciliation.
+- Phase 8 tests pass for deterministic canonical hashing, snapshot tamper detection, release-only/idempotent issuance, QR-backed PDF generation, public verification, and PDF serving.
 
 ## Open Phase 0/1 work
 
@@ -84,7 +93,6 @@ Phases 0 through 7 are implemented and verified locally. Phase 6 uses Payaza's t
 
 ## Remaining phases
 
-- **Phase 8: License certificate.** PDF creation, canonical-data SHA-256, QR verification URL, file storage, WhatsApp document delivery, and public verification.
 - **Phase 9: React wireframe.** Auth, dashboard, deal details with timeline/ledger/messages, license list, and public verification page, using typed REST responses.
 - **Phase 10: Demo hardening.** Written end-to-end demo procedure, request IDs and structured logs, webhook troubleshooting, and fixes for failures found.
 
@@ -103,3 +111,4 @@ Phases 0 through 7 are implemented and verified locally. Phase 6 uses Payaza's t
 - Payaza must be configured to send collection webhooks to `/webhooks/payaza` on the public HTTPS API origin. Live payments remain out of scope for Phase 6.
 - `PAYAZA_TRANSACTION_PIN` and `PAYAZA_ACCOUNT_REFERENCE` are currently missing from local `.env`; they are optional config and must be supplied locally before a real transfer adapter can be used. Phase 7 release currently only queues `READY` payouts; no transfer was submitted.
 - WhatsApp seller payout setup uses `PAYOUT <bank-code> <10-digit-account> <account-name> | <sender-address>`, followed by `CONFIRM PAYOUT`. Sellers can view statuses with `PAYOUT STATUS`; buyers use `RELEASE DEAL-<code>` or `ISSUE DEAL-<code>`, and sellers use `DELIVER <code> <delivery note>`.
+- Apply the Phase 8 migration before issuing certificates against a persistent database. Certificate PDFs are stored locally in ignored `backend/storage/licenses/`; production deployment must mount durable storage or replace this path with an object-storage backend.
