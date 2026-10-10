@@ -183,6 +183,8 @@ img, svg { display: block; }
 .nav-links a.active::after { width: 15px; }
 
 .signin-button {
+  position: relative;
+  z-index: 80;
   padding: 10px 15px;
   border: 1px solid var(--burgundy-primary);
   border-radius: 8px;
@@ -2012,9 +2014,8 @@ img, svg { display: block; }
 .signin-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 99;
+  z-index: 70;
   background: rgba(0,0,0,0.35);
-  backdrop-filter: blur(2px);
 }
 .signin-sub {
   margin: 4px 0 0;
