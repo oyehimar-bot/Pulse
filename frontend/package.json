@@ -9,7 +9,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
-    "typescript": "^5.x.x",
     "@vitejs/plugin-react": "^5.0.4",
     "lucide-react": "^1.54.0",
     "react": "^19.2.0",
@@ -19,5 +18,8 @@
   "devDependencies": {
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }
